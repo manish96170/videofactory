@@ -1,0 +1,34 @@
+# Build artifacts
+/bin/
+/dist/
+/videofactory
+*.test
+*.out
+coverage.out
+coverage.html
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors / IDE
+.vscode/
+.idea/
+*.swp
+
+# Environment / secrets - never commit these
+.env
+.env.*
+*.pem
+*.key
+*.crt
+secrets/
+
+# Local generated/runtime data - never commit large or machine-specific
+# artifacts (PHASES.md section 17).
+/output/
+/renders/
+/tmp/
+/.cache/
+/models/
+*.local.*

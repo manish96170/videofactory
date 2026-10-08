@@ -1,0 +1,3030 @@
+# Video Factory — Master Multi-Agent Implementation Plan
+
+> **Purpose:** This document is the single operating contract for implementing the Video Factory repository from an empty/new codebase into a production-oriented deterministic video factory with pluggable AI providers.
+>
+> **Execution model:** A main OpenCode session acts as the **orchestrator/lead engineer**. It delegates implementation and review work to specialized agents/models (`terra`, `sol`, `luna`, etc.), integrates their work, runs tests, updates documentation, and commits each completed phase.
+>
+> **Important:** This is an implementation plan, not merely an architecture document. Agents must execute the TODOs, maintain evidence, update the checklist, and leave the repository in a resumable state.
+
+---
+
+# 0. Non-Negotiable Rules
+
+## 0.1 Main session is the orchestrator
+
+The main session must:
+
+1. Read this file completely before changing code.
+2. Inspect the current repository before making assumptions.
+3. Maintain the phase TODO/checklist in this file.
+4. Delegate meaningful implementation/review tasks to agents.
+5. Never blindly accept an agent's output.
+6. Inspect diffs and test results itself.
+7. Integrate valid review findings.
+8. Run the required tests before marking a phase complete.
+9. Update architecture/decision/docs when implementation changes the documented design.
+10. Commit **one commit per completed phase**.
+11. Never auto-push unless explicitly requested.
+12. Never rewrite published history.
+13. Never use `git commit --amend` for completed phase commits unless fixing an immediately-created local mistake before the phase is considered complete.
+14. Preserve a clean, understandable commit history.
+
+The repository owner/target GitHub account is:
+
+```text
+github.com/manish96170
+```
+
+The intended repository is a **public repository**.
+
+Do not expose secrets, API keys, credentials, personal tokens, local absolute paths, or private infrastructure configuration.
+
+---
+
+# 1. Product Definition
+
+The product is a **deterministic video factory / video compiler with AI shot generators**.
+
+It is NOT primarily an AI video model.
+
+The system should combine:
+
+```text
+Prompt
+  ↓
+Director
+  ↓
+Video Plan
+  ↓
+Shot Planner
+  ↓
+Shot Intelligence
+  ↓
+Decision Engine
+  ↓
+Provider Router
+  ↓
+Resource Planner
+  ↓
+Execution
+  ↓
+Validation
+  ↓
+Timeline
+  ↓
+Final Render
+```
+
+The system must prefer deterministic generation whenever possible.
+
+AI should be used where AI provides genuine value:
+
+- realistic human motion
+- realistic environments
+- cinematic camera movement
+- avatar animation
+- image/video generation
+- semantic decisions
+- speech recognition
+- speech synthesis
+- visual understanding
+
+Exact content such as code, UI, terminal output, charts, captions, subtitles, layout, timing, and other structured visuals should normally be deterministic.
+
+Core principle:
+
+> **LLMs propose. Decision models classify. Deterministic code decides.**
+
+---
+
+# 2. Target Architecture
+
+## 2.1 Core language strategy
+
+### Go is the core language.
+
+Use Go for:
+
+- project state
+- planning
+- Director orchestration
+- Decision Engine
+- provider registry/router
+- resource planner
+- model manager
+- scheduler
+- event system
+- workers/orchestration
+- cache
+- validation orchestration
+- timeline orchestration
+- TUI
+- future API/control plane
+- AWS/Lambda-compatible control-plane components
+
+### Python is a worker language.
+
+Use Python only where ML ecosystems require it:
+
+- PyTorch
+- MLX where appropriate
+- Whisper/faster-whisper
+- Qwen ASR
+- InvokeAI
+- FreeVideo
+- Wan
+- other Python-native ML providers
+
+Do **not** embed Python into Go initially.
+
+Use process boundaries:
+
+```text
+Go Core
+  ├── starts worker process
+  ├── sends structured request
+  ├── receives structured result
+  ├── monitors stdout/stderr
+  ├── monitors resource usage
+  ├── cancels process when needed
+  └── unloads/stops worker
+```
+
+Possible protocols:
+
+- JSON over stdin/stdout
+- localhost HTTP
+- Unix domain sockets
+
+Choose the simplest protocol for each worker.
+
+### TypeScript/JavaScript
+
+Use TypeScript/JavaScript only where appropriate:
+
+- Remotion
+- React
+- browser/HTML/SVG rendering
+- Playwright/browser automation
+
+### Native tools
+
+Use native executables where appropriate:
+
+- FFmpeg
+- FFprobe
+- OpenCV
+- other mature native utilities
+
+### Rust
+
+Do not introduce Rust in the initial implementation merely for theoretical performance.
+
+Consider Rust later only if profiling proves a specific component is CPU/memory-bound and Go is insufficient.
+
+---
+
+# 3. Hardware / Resource Target
+
+Primary development target:
+
+```text
+Apple Silicon Mac
+M1 Pro
+16 GB unified memory
+No discrete GPU
+```
+
+The architecture must not assume that a powerful GPU exists.
+
+The system must support:
+
+```text
+small local model
+→ heavy model loaded
+→ generate
+→ unload
+→ another heavy model loaded
+→ generate
+→ unload
+```
+
+Resource management is a first-class architectural concern.
+
+Example:
+
+```text
+Machine memory: 16 GB
+
+OS/system reserve:       3 GB
+User reserve:             4 GB
+Factory budget:           9 GB
+
+Director:                 1.5 GB
+Worker available:         7.5 GB
+
+Model A requires 6 GB
+→ ALLOW
+
+Model B requires 5 GB concurrently
+→ WAIT / UNLOAD / REMOTE
+```
+
+The LLM must never be the authority enforcing resource limits.
+
+The **Resource Manager** must enforce them.
+
+---
+
+# 4. Architectural Principles
+
+Agents must preserve these principles throughout all phases.
+
+## 4.1 Provider independence
+
+Core must not depend directly on:
+
+- InvokeAI
+- FreeVideo
+- OpenMotion
+- Wan
+- Veo
+- Runway
+- Whisper
+- Qwen ASR
+- a particular LLM
+- a particular API vendor
+
+Providers implement interfaces/contracts.
+
+## 4.2 Model independence
+
+Do not hard-code business logic around model names.
+
+Bad:
+
+```text
+if model == "qwen3":
+    ...
+```
+
+Good:
+
+```text
+if provider.Capabilities().Supports("semantic-decision"):
+    ...
+```
+
+Model selection should come from:
+
+```text
+ProviderRegistry
+ProviderCapabilities
+DecisionPolicy
+ResourcePlanner
+ProviderRouter
+```
+
+## 4.3 Deterministic first
+
+For every shot ask:
+
+```text
+Can this be deterministic?
+Can an existing asset be reused?
+Can an image be used instead of video?
+Can an existing image be animated?
+Can a cheap local model solve it?
+Does it really need an expensive cloud model?
+```
+
+## 4.4 Small shots
+
+Target shot granularity:
+
+```text
+~2–3 seconds
+```
+
+Not every shot must be exactly 2–3 seconds, but short shots should be the default design assumption.
+
+Benefits:
+
+- easier retries
+- smaller model context
+- cheaper generation
+- local feasibility
+- easier validation
+- provider routing
+- deterministic composition
+- incremental rebuild
+
+## 4.5 Preview first
+
+Generation should support:
+
+```text
+draft/preview
+→ validate
+→ inspect
+→ approve
+→ final quality
+```
+
+Do not waste expensive compute before validating the concept.
+
+## 4.6 Incremental rebuild
+
+Changing Shot 17 must not regenerate Shots 1–16.
+
+Use hashes/cache/checkpoints and dependency-aware invalidation.
+
+## 4.6.1 Visual addressability
+
+Rendered content must be addressable without relying on computer vision or LLM guessing when the renderer already knows the element identity.
+
+The canonical relationship is:
+
+```text
+Project
+  ↓
+Shot
+  ↓
+VisualElement
+  ↓
+Timeline / property / timestamp
+```
+
+A visual element should have a stable ID and enough metadata for a preview surface to map a user interaction back to the authoritative project state.
+
+Example:
+
+```text
+elementId
+shotId
+start
+end
+type
+bounds (when applicable)
+editableProperties
+```
+
+The rendered MP4 is a preview artifact, not the source of truth.
+
+## 4.6.2 Visual review loop
+
+The system should support this loop without creating a second editor architecture:
+
+```text
+Render
+→ Preview
+→ User selects element / timestamp
+→ ReviewFeedback
+→ Director / Intent
+→ ChangeSet
+→ Validate
+→ Apply
+→ Affected-shot calculation
+→ Cache invalidation
+→ Incremental rebuild
+→ Preview
+```
+
+The same core contracts must support both a richer local web preview and the TUI control plane.
+
+## 4.7 Explicit lifecycle
+
+Every heavy resource should have a clear lifecycle:
+
+```text
+acquire
+→ load
+→ use
+→ validate
+→ release
+→ unload
+```
+
+No hidden global model state.
+
+## 4.8 Cancellation
+
+Every long-running operation should support cancellation using:
+
+```go
+context.Context
+```
+
+Cancellation must propagate through:
+
+```text
+TUI
+→ scheduler
+→ worker
+→ provider
+→ process
+```
+
+## 4.9 No unnecessary dependencies
+
+Prefer Go standard library for the core.
+
+Add dependencies only when they provide substantial value.
+
+Avoid framework-heavy architecture in Phase 0.
+
+## 4.10 Lambda awareness
+
+Core packages should avoid assumptions that prevent future Lambda/control-plane execution:
+
+- no required long-lived global process
+- no mandatory local filesystem state
+- no hard-coded daemon assumptions
+- no reliance on environment-specific paths
+- no uncontrolled goroutines
+- explicit configuration
+- explicit lifecycle
+- serializable requests/results
+
+Heavy video/ML inference does NOT belong in Lambda.
+
+Future architecture may use:
+
+```text
+Video Factory
+    ↓
+Execution Planner
+    ├── local Mac
+    ├── CPU worker
+    ├── GPU EC2
+    ├── ECS
+    ├── AWS Batch
+    ├── Lambda control-plane task
+    └── external cloud provider
+```
+
+---
+
+# 5. Core Domain Model
+
+The system should eventually contain at least:
+
+```text
+Project
+VideoPlan
+Shot
+Timeline
+Asset
+Primitive
+Flow
+Framing
+DecisionRequest
+DecisionResult
+DecisionProvider
+ProviderCapabilities
+GenerationRequest
+GenerationResult
+ValidationResult
+ResourcePlan
+ModelCapabilities
+VisualElement
+RenderManifest
+ReviewFeedback
+ChangeSet
+```
+
+Do not add fields merely because they sound useful.
+
+Every field should have a clear purpose.
+
+### VisualElement
+
+A `VisualElement` represents a stable, inspectable element produced by the timeline/renderer.
+
+Conceptually:
+
+```text
+VisualElement
+├── elementId
+├── shotId
+├── type
+├── start
+├── end
+├── bounds (optional)
+└── editableProperties
+```
+
+It is metadata about the rendered representation, not a second source of truth.
+
+### RenderManifest
+
+The renderer may emit a sidecar manifest mapping rendered elements to authoritative project/timeline entities.
+
+Example:
+
+```text
+shot-017.mp4
+shot-017.json
+shot-017.render.json
+```
+
+The exact storage format may change, but the contract should allow preview clients to resolve:
+
+```text
+timestamp + selected element
+→ VisualElement
+→ project/shot/timeline target
+```
+
+### ReviewFeedback
+
+User feedback captured from a preview surface.
+
+It should support at least:
+
+```text
+project
+shot
+element
+timestamp
+optional duration
+feedback type
+natural-language note
+createdAt
+```
+
+### ChangeSet
+
+A validated, reviewable set of mutations to authoritative project state.
+
+Visual feedback must eventually become a normal `ChangeSet`; do not create a separate visual-edit mutation system.
+
+---
+
+# 6. Shot Model
+
+Recommended conceptual shot categories:
+
+```text
+UI
+CODE
+TERMINAL
+CHART
+AVATAR
+TRANSITION
+ENVIRONMENT
+HUMAN_ACTION
+CINEMATIC
+```
+
+Typical deterministic primitives:
+
+```text
+CodeEditor
+Terminal
+Browser
+Chart
+Text
+Subtitle
+Cursor
+Image
+Transition
+```
+
+AI-capable primitives:
+
+```text
+DeveloperAvatar
+HumanAction
+Environment
+CinematicCamera
+AnimatedImage
+```
+
+---
+
+# 7. Flow vs Framing
+
+These concepts must remain separate.
+
+## Flow
+
+Defines what type of video is being produced:
+
+```text
+developer-explainer
+cinematic-product-demo
+code-tutorial
+talking-head
+social-video
+```
+
+## Framing
+
+Defines layout/composition:
+
+```text
+developer-circle
+fullscreen
+split-screen
+picture-in-picture
+screen-focused
+```
+
+`developer-circle` must NOT become a hard-coded global architecture.
+
+It is simply one reusable framing strategy.
+
+---
+
+# 8. Decision Engine
+
+Decision models should return structured classifications instead of prose.
+
+Example:
+
+```json
+{
+  "decision": "yes",
+  "score": 0.94,
+  "reasonCode": "REALISTIC_HUMAN_MOTION"
+}
+```
+
+Preferred decisions:
+
+```text
+YES
+NO
+UNCERTAIN
+```
+
+Example policy:
+
+```text
+score >= 0.85 → YES
+score <= 0.30 → NO
+otherwise     → UNCERTAIN
+```
+
+The exact threshold must be configurable.
+
+Possible providers:
+
+```text
+JEV
+Qwen local
+Gemma local
+Claude Haiku
+Gemini Flash
+future providers
+```
+
+Example configuration:
+
+```yaml
+decisions:
+  deterministic_possible:
+    provider: qwen-local
+    model: qwen3-small
+
+  visual_classification:
+    provider: gemma-local
+
+  semantic_question:
+    provider: claude-haiku
+
+  form_action:
+    provider: jev
+    model: jev-v2
+```
+
+Do not hard-code these providers into core business logic.
+
+---
+
+# 9. Resource Management
+
+The system must eventually expose a resource budget similar to:
+
+```yaml
+resources:
+  totalMemoryGb: 16
+  reservedGb: 2
+  director:
+    maxMemoryGb: 2
+  workers:
+    maxTotalMemoryGb: 10
+  systemReserveGb: 4
+  maxParallelWorkers: 2
+```
+
+Users should also eventually be able to express natural constraints such as:
+
+```text
+Keep at least 4GB free.
+Do not run more than one heavy model.
+Use remote generation if local memory is insufficient.
+```
+
+But:
+
+> The Director may translate user intent into constraints; the Resource Manager is the enforcement authority.
+
+Conceptual Go API:
+
+```go
+lease, err := resources.Acquire(ResourceRequest{
+    RAM:       4 * GB,
+    CPU:       2,
+    GPU:       0,
+    Exclusive: false,
+})
+if err != nil {
+    return err
+}
+defer lease.Release()
+```
+
+Resource planning should eventually account for:
+
+- RAM
+- CPU
+- GPU/Metal capability
+- model size
+- resolution
+- frame count
+- precision
+- offloading
+- chunking
+- concurrency
+- historical timing
+- historical peak memory
+- preview mode
+- local/remote eligibility
+
+---
+
+# 10. Event Architecture
+
+The execution backbone should be event-oriented.
+
+Initial event vocabulary:
+
+```text
+PROJECT_CREATED
+PLAN_CREATED
+SHOT_CREATED
+SHOT_UPDATED
+SHOT_INVALIDATED
+
+MODEL_LOAD_STARTED
+MODEL_LOADED
+MODEL_UNLOADED
+
+GENERATION_STARTED
+GENERATION_PROGRESS
+GENERATION_COMPLETED
+GENERATION_FAILED
+
+VALIDATION_STARTED
+VALIDATION_COMPLETED
+VALIDATION_FAILED
+
+TIMELINE_UPDATED
+
+RENDER_STARTED
+RENDER_COMPLETED
+```
+
+The event system should not force the entire product into a complicated event-sourcing framework prematurely.
+
+Use a pragmatic event-driven architecture.
+
+Core state remains the source of truth.
+
+---
+
+# 11. TUI
+
+The TUI is a control plane, not the renderer.
+
+Target inspiration:
+
+```text
+OpenCode-like terminal IDE/control room
+```
+
+Conceptual tabs:
+
+```text
+[Chat] [Plan] [Shots] [Timeline] [Assets] [Models] [Logs]
+```
+
+Potential panels:
+
+- project
+- shot list
+- shot inspector
+- timeline
+- asset browser
+- model status
+- resource usage
+- logs
+- generation progress
+- preview
+- Director chat
+
+Examples of user commands:
+
+```text
+Make shot 3 fullscreen.
+Change this to deterministic code.
+Generate 3 previews.
+Use Claude Haiku for semantic decisions.
+Use Qwen locally for cheap decisions.
+Don't use more than 4GB RAM.
+```
+
+Chat must eventually translate into structured project mutations:
+
+```text
+User
+→ Director Chat
+→ Intent
+→ ChangeSet
+→ Review/Apply
+→ Invalidate affected shots
+→ Rebuild
+```
+
+The TUI must remain responsive while workers run.
+
+---
+
+# 12. Review Workflow
+
+Every phase must follow:
+
+```text
+Implement
+→ Self-review
+→ Tests
+→ Agent Review #1
+→ Fix
+→ Tests
+→ Agent Review #2
+→ Fix
+→ Tests
+→ Final lead review
+→ Documentation update
+→ Commit phase
+```
+
+## 12.1 Agent rotation
+
+Do not let the same model write and perform the only review.
+
+Use different agents/models.
+
+Example:
+
+```text
+Phase implementation: Terra
+Review #1: Sol
+Review #2: Luna
+```
+
+Next phase:
+
+```text
+Implementation: Sol
+Review #1: Luna
+Review #2: Terra
+```
+
+Then rotate.
+
+The exact mapping may be adapted based on which models are actually available.
+
+## 12.2 Review command
+
+Agents may be invoked through OpenCode-style commands such as:
+
+```text
+opencode --agent terra
+opencode --agent sol
+opencode --agent luna
+```
+
+Do not assume these names map to a specific model without checking the local OpenCode configuration.
+
+The main session must verify which model each agent actually uses before relying on the review assignment.
+
+## 12.3 Last two phases
+
+At minimum, the **last two completed phases** must each receive review from **two different models sequentially** before being considered final.
+
+This is a hard quality gate.
+
+## 12.4 Evidence of review
+
+A review is not complete because an agent said:
+
+```text
+LGTM
+```
+
+The main session must preserve evidence.
+
+For every review record:
+
+```text
+Phase:
+Reviewer:
+Model:
+Date:
+Commit reviewed:
+Scope:
+Findings:
+Severity:
+Files:
+Resolution:
+Tests rerun:
+Final status:
+```
+
+Store review evidence in:
+
+```text
+docs/reviews/
+```
+
+Recommended:
+
+```text
+docs/reviews/phase-01-review-terra.md
+docs/reviews/phase-01-review-sol.md
+```
+
+If the review is only useful in the current context, still summarize it into the phase evidence file before commit.
+
+---
+
+# 13. Severity Policy
+
+Review findings:
+
+```text
+BLOCKER
+HIGH
+MEDIUM
+LOW
+INFO
+```
+
+Rules:
+
+### BLOCKER
+
+Must fix before phase commit.
+
+### HIGH
+
+Must fix before phase commit unless the lead explicitly documents why it is deferred.
+
+### MEDIUM
+
+Fix if within phase scope.
+
+Otherwise document as a follow-up TODO.
+
+### LOW / INFO
+
+May be documented without implementation if not material.
+
+Never silently ignore findings.
+
+---
+
+# 14. Phase Completion Gate
+
+A phase may be marked complete only when:
+
+```text
+[ ] All phase implementation TODOs complete
+[ ] Unit tests pass
+[ ] Integration tests pass where applicable
+[ ] go test ./...
+[ ] go test -race ./... where applicable
+[ ] go vet ./...
+[ ] Build succeeds
+[ ] Agent review #1 completed
+[ ] Review #1 findings resolved/documented
+[ ] Tests rerun
+[ ] Agent review #2 completed
+[ ] Review #2 findings resolved/documented
+[ ] Tests rerun
+[ ] Documentation updated
+[ ] Review evidence written
+[ ] Git diff inspected
+[ ] No accidental files/secrets
+[ ] Phase commit created
+```
+
+Only then change the phase status to:
+
+```text
+DONE
+```
+
+---
+
+# 15. Context Management
+
+OpenCode sessions may become large.
+
+The main session must proactively monitor context.
+
+When approximately **80% of available context** is consumed:
+
+1. Stop starting new unrelated work.
+2. Inspect current TODO state.
+3. Finish or safely checkpoint the current atomic task.
+4. Update this file.
+5. Update relevant architecture/decision documents.
+6. Record:
+   - completed work
+   - incomplete work
+   - current branch
+   - current commit
+   - uncommitted files
+   - tests run
+   - review status
+   - known issues
+   - next exact tasks
+7. Create a clean next-session handoff prompt.
+8. Save the handoff under:
+
+```text
+docs/handoffs/
+```
+
+Recommended filename:
+
+```text
+docs/handoffs/next-session-phase-XX.md
+```
+
+The final response of the session should also contain a concise copy of the next-session prompt.
+
+Do NOT continue blindly until context is exhausted.
+
+---
+
+# 16. Documentation Structure
+
+Maintain:
+
+```text
+README.md
+AGENTS.md
+ARCHITECTURE.md
+DECISIONS.md
+ROADMAP.md
+
+docs/
+├── architecture/
+├── decisions/
+├── reviews/
+├── handoffs/
+└── phases/
+```
+
+Use the simplest structure that remains useful.
+
+Do not generate documentation merely for the sake of documentation.
+
+---
+
+# 17. Git Rules
+
+Every phase gets exactly one logical phase commit.
+
+Example:
+
+```text
+phase 00: foundation and contracts
+phase 01: project state and timeline
+phase 02: event system
+phase 03: deterministic renderer
+...
+```
+
+Commit format:
+
+```text
+phase(00): establish foundation and contracts
+phase(01): implement project state and timeline
+phase(02): implement event system
+```
+
+No automatic push.
+
+No automatic merge.
+
+No auto-generated credentials.
+
+No committing:
+
+```text
+.env
+API keys
+tokens
+credentials
+local model weights
+large generated videos
+machine-specific configuration
+private data
+```
+
+Use `.gitignore` from the beginning.
+
+---
+
+# 18. Public Repository Requirement
+
+The repository is intended to be public under:
+
+```text
+github.com/manish96170
+```
+
+The implementation must therefore be safe for public source control.
+
+Before the first public push, run a repository hygiene review:
+
+```text
+git status
+git diff
+git diff --cached
+git ls-files
+```
+
+Check for:
+
+- secrets
+- API keys
+- credentials
+- personal information
+- private URLs
+- local machine paths
+- model weights
+- generated media
+- oversized artifacts
+- proprietary code copied from external projects
+
+The repository should contain:
+
+```text
+LICENSE
+README.md
+CONTRIBUTING.md
+.gitignore
+```
+
+Use a permissive open-source license only after confirming the intended project licensing decision.
+
+Do not invent third-party licenses.
+
+If third-party source code is copied, preserve its license and attribution requirements.
+
+---
+
+# 19. Development Quality Rules
+
+Every Go package should aim for:
+
+- small interfaces
+- explicit dependencies
+- dependency injection
+- context cancellation
+- deterministic behavior where possible
+- structured errors
+- useful error messages
+- no hidden global mutable state
+- testable units
+- clear package boundaries
+
+Prefer:
+
+```go
+type Provider interface {
+    ID() string
+    Capabilities(ctx context.Context) (ProviderCapabilities, error)
+}
+```
+
+over giant interfaces containing every possible provider operation.
+
+Split interfaces by capability when appropriate.
+
+Avoid:
+
+```go
+type GodProvider interface {
+    GenerateVideo()
+    GenerateImage()
+    Transcribe()
+    Synthesize()
+    Decide()
+    Render()
+    Validate()
+    ...
+}
+```
+
+---
+
+# 20. Phase Roadmap
+
+The implementation is divided into the following phases.
+
+```text
+PHASE 00  Foundation / Contracts
+PHASE 01  Project State / Timeline
+PHASE 02  Event System
+PHASE 03  Deterministic Renderer
+PHASE 04  Flows / Framing / Primitives
+PHASE 05  Director / Video Planning
+PHASE 06  Decision Engine
+PHASE 07  Provider System / Router
+PHASE 08  Model Manager / Resource Planner
+PHASE 09  Validation / Shot Intelligence
+PHASE 10  Preview / Checkpoint / Cache / Visual Review
+PHASE 11  Audio / Timestamp / Temporal Intelligence
+PHASE 12  TUI Control Plane / Visual Review
+PHASE 13  Director Chat / ChangeSets / Visual Editing
+PHASE 14  Local AI Providers
+PHASE 15  Cloud Providers
+PHASE 16  End-to-End Autonomous Pipeline
+PHASE 17  Performance / Reliability / Packaging
+PHASE 18  Public Repository / Release Readiness
+```
+
+Do not skip phases merely because later code appears easy.
+
+A phase can be merged with the next phase only if the lead explicitly determines that the separation creates no useful architectural boundary and documents the reason.
+
+---
+
+# PHASE 00 — FOUNDATION / CONTRACTS
+
+## Goal
+
+Create the Go repository foundation and stable domain contracts.
+
+## TODO
+
+- [x] Inspect repository
+- [x] Determine current repository state
+- [x] Create/update `AGENTS.md`
+- [x] Create/update `ARCHITECTURE.md`
+- [x] Create/update `DECISIONS.md`
+- [x] Create/update `ROADMAP.md`
+- [x] Initialize Go module if needed
+- [x] Establish package structure
+- [x] Create domain contracts
+- [x] Create event contracts
+- [x] Create provider capability contracts
+- [x] Create decision contracts
+- [x] Create generation contracts
+- [x] Create validation contracts
+- [x] Create resource contracts
+- [x] Create model capability contracts
+- [x] Add JSON serialization where needed
+- [x] Add context-aware interfaces
+- [x] Add tests
+- [x] Add `.gitignore`
+- [x] Add basic public-repository hygiene
+- [x] Run `go test ./...`
+- [x] Run `go test -race ./...`
+- [x] Run `go vet ./...`
+- [x] Build executable
+- [x] Agent review #1 (terra — see `docs/reviews/phase-00-review-terra.md`)
+- [x] Resolve findings
+- [x] Agent review #2 (astra — see `docs/reviews/phase-00-review-astra.md`)
+- [x] Resolve findings
+- [x] Write review evidence (`docs/phases/phase-00.md`, `docs/reviews/`)
+- [x] Update docs
+- [x] Commit phase
+
+## Explicit non-goals
+
+Do NOT implement:
+
+- AI providers
+- cloud providers
+- TUI
+- model inference
+- heavy rendering
+- Python embedding
+- complex scheduler
+- cloud infrastructure
+
+## Required result
+
+The repository should compile and provide stable contracts for future phases.
+
+---
+
+# PHASE 01 — PROJECT STATE / TIMELINE
+
+## Goal
+
+Implement project persistence and the fundamental video data model.
+
+## TODO
+
+- [ ] Project model
+- [ ] VideoPlan model
+- [ ] Shot model
+- [ ] Timeline model
+- [ ] Asset model
+- [ ] Primitive model
+- [ ] Flow model
+- [ ] Framing model
+- [ ] Project loading
+- [ ] Project saving
+- [ ] Versioning strategy
+- [ ] Stable IDs
+- [ ] Stable visual element IDs
+- [ ] Element-to-shot/timeline relationship
+- [ ] Deterministic serialization
+- [ ] Timeline validation
+- [ ] Dependency representation
+- [ ] Unit tests
+- [ ] Corrupt-state/error handling
+- [ ] Agent review #1
+- [ ] Fix findings
+- [ ] Agent review #2
+- [ ] Fix findings
+- [ ] Review evidence
+- [ ] Docs
+- [ ] Commit
+
+## Required result
+
+A project can be created, loaded, modified, saved, and validated without any renderer or AI model.
+
+---
+
+# PHASE 02 — EVENT SYSTEM
+
+## Goal
+
+Create the event backbone for observable execution.
+
+## TODO
+
+- [ ] Event type
+- [ ] Event metadata
+- [ ] Event IDs
+- [ ] timestamps
+- [ ] project/shot correlation IDs
+- [ ] event payloads
+- [ ] event publisher
+- [ ] event subscriber
+- [ ] cancellation
+- [ ] backpressure behavior
+- [ ] error behavior
+- [ ] test concurrent subscribers
+- [ ] test event ordering guarantees
+- [ ] document ordering semantics
+- [ ] Agent review #1
+- [ ] Fix
+- [ ] Agent review #2
+- [ ] Fix
+- [ ] Evidence
+- [ ] Docs
+- [ ] Commit
+
+## Required result
+
+Workers and future TUI components can observe execution without directly coupling to one another.
+
+---
+
+# PHASE 03 — DETERMINISTIC RENDERER
+
+## Goal
+
+Produce a real MP4 from deterministic primitives.
+
+This is the first major milestone.
+
+Target:
+
+```text
+manual VideoPlan
+→ deterministic shots
+→ renderer
+→ MP4
+```
+
+## TODO
+
+- [ ] Renderer interface
+- [ ] deterministic rendering backend
+- [ ] FFmpeg integration strategy
+- [ ] basic text primitive
+- [ ] basic image primitive
+- [ ] basic background primitive
+- [ ] basic transition
+- [ ] shot composition
+- [ ] timeline composition
+- [ ] render output
+- [ ] metadata
+- [ ] render manifest / visual element metadata
+- [ ] stable rendered element identity
+- [ ] element-to-shot/timeline mapping
+- [ ] editable-property metadata
+- [ ] FFprobe validation
+- [ ] deterministic test fixture
+- [ ] end-to-end render test
+- [ ] Agent review #1
+- [ ] Fix
+- [ ] Agent review #2
+- [ ] Fix
+- [ ] Evidence
+- [ ] Docs
+- [ ] Commit
+
+## Required result
+
+The repository can generate a playable deterministic MP4 without AI.
+
+---
+
+# PHASE 04 — FLOWS / FRAMING / PRIMITIVES
+
+## Goal
+
+Make video composition reusable instead of hard-coded.
+
+## TODO
+
+- [ ] Flow registry
+- [ ] Framing registry
+- [ ] primitive registry
+- [ ] capability declarations
+- [ ] developer-explainer flow
+- [ ] code-tutorial flow
+- [ ] fullscreen framing
+- [ ] split-screen framing
+- [ ] picture-in-picture framing
+- [ ] developer-circle framing
+- [ ] screen-focused framing
+- [ ] composition tests
+- [ ] ensure framing is not embedded into business logic
+- [ ] Agent review #1
+- [ ] Fix
+- [ ] Agent review #2
+- [ ] Fix
+- [ ] Evidence
+- [ ] Docs
+- [ ] Commit
+
+---
+
+# PHASE 05 — DIRECTOR / VIDEO PLANNING
+
+## Goal
+
+Convert a user prompt into a structured VideoPlan.
+
+The Director should plan, not render.
+
+## Pipeline
+
+```text
+Prompt
+→ Director
+→ VideoPlan
+```
+
+## TODO
+
+- [ ] Director interface
+- [ ] planning request
+- [ ] planning result
+- [ ] flow selection
+- [ ] framing selection
+- [ ] shot decomposition
+- [ ] shot duration planning
+- [ ] deterministic-vs-AI intent
+- [ ] asset requirements
+- [ ] provider capability requirements
+- [ ] plan validation
+- [ ] deterministic fixture Director
+- [ ] optional LLM adapter interface
+- [ ] prompt/version metadata
+- [ ] tests
+- [ ] Agent review #1
+- [ ] Fix
+- [ ] Agent review #2
+- [ ] Fix
+- [ ] Evidence
+- [ ] Docs
+- [ ] Commit
+
+## Important
+
+Do not tightly couple the Director to Claude, Qwen, Gemini, or any single model.
+
+---
+
+# PHASE 06 — DECISION ENGINE
+
+## Goal
+
+Build structured, cheap, pluggable classification.
+
+## TODO
+
+- [ ] DecisionProvider interface
+- [ ] DecisionRequest
+- [ ] DecisionResult
+- [ ] YES/NO/UNCERTAIN
+- [ ] confidence/score
+- [ ] reason codes
+- [ ] configurable thresholds
+- [ ] fallback/escalation policy
+- [ ] provider registry integration
+- [ ] deterministic mock provider
+- [ ] timeout handling
+- [ ] retry policy
+- [ ] malformed-result handling
+- [ ] audit logging
+- [ ] tests
+- [ ] Agent review #1
+- [ ] Fix
+- [ ] Agent review #2
+- [ ] Fix
+- [ ] Evidence
+- [ ] Docs
+- [ ] Commit
+
+---
+
+# PHASE 07 — PROVIDER SYSTEM / ROUTER
+
+## Goal
+
+Introduce provider abstraction and routing.
+
+## TODO
+
+- [ ] Provider interface
+- [ ] ProviderCapabilities
+- [ ] ProviderRegistry
+- [ ] ProviderRouter
+- [ ] local provider classification
+- [ ] remote provider classification
+- [ ] deterministic provider classification
+- [ ] capability matching
+- [ ] cost metadata
+- [ ] latency metadata
+- [ ] hardware requirements
+- [ ] provider health state
+- [ ] eligibility checks
+- [ ] routing policy
+- [ ] fallback policy
+- [ ] tests
+- [ ] Agent review #1
+- [ ] Fix
+- [ ] Agent review #2
+- [ ] Fix
+- [ ] Evidence
+- [ ] Docs
+- [ ] Commit
+
+---
+
+# PHASE 08 — MODEL MANAGER / RESOURCE PLANNER
+
+## Goal
+
+Make local AI execution hardware-aware and memory-safe.
+
+## TODO
+
+- [ ] ResourceManager interface
+- [ ] ResourceRequest
+- [ ] ResourceLease
+- [ ] ResourcePlan
+- [ ] memory budget
+- [ ] CPU budget
+- [ ] GPU/Metal capability representation
+- [ ] model requirements
+- [ ] model lifecycle
+- [ ] load/unload interface
+- [ ] resource reservation
+- [ ] resource release
+- [ ] concurrency limits
+- [ ] queueing
+- [ ] cancellation
+- [ ] process monitoring
+- [ ] peak-memory tracking
+- [ ] model timing
+- [ ] adaptive historical planning
+- [ ] local-vs-remote decision
+- [ ] worker process abstraction
+- [ ] no Python embedding
+- [ ] tests for over-budget requests
+- [ ] tests for concurrent resource requests
+- [ ] race tests
+- [ ] Agent review #1
+- [ ] Fix
+- [ ] Agent review #2
+- [ ] Fix
+- [ ] Evidence
+- [ ] Docs
+- [ ] Commit
+
+## Required invariant
+
+Resource limits must be enforced by code, not by LLM instructions.
+
+---
+
+# PHASE 09 — VALIDATION / SHOT INTELLIGENCE
+
+## Goal
+
+Prevent expensive generation when cheaper deterministic approaches are sufficient.
+
+Pipeline:
+
+```text
+Shot
+→ Shot Intelligence
+→ Decision
+→ Provider
+```
+
+## TODO
+
+- [ ] deterministic feasibility check
+- [ ] asset reuse check
+- [ ] image-vs-video check
+- [ ] animate-existing-image check
+- [ ] local-vs-cloud check
+- [ ] provider eligibility check
+- [ ] quality requirements
+- [ ] validation rules
+- [ ] video metadata validation
+- [ ] duration validation
+- [ ] frame-rate validation
+- [ ] resolution validation
+- [ ] audio validation
+- [ ] basic visual checks
+- [ ] failure classification
+- [ ] retry recommendation
+- [ ] tests
+- [ ] Agent review #1
+- [ ] Fix
+- [ ] Agent review #2
+- [ ] Fix
+- [ ] Evidence
+- [ ] Docs
+- [ ] Commit
+
+---
+
+# PHASE 10 — PREVIEW / CHECKPOINT / CACHE
+
+## Goal
+
+Make iteration cheap and incremental.
+
+## TODO
+
+- [ ] preview mode
+- [ ] draft quality
+- [ ] final quality
+- [ ] preview output
+- [ ] shot cache
+- [ ] input hashing
+- [ ] dependency hashing
+- [ ] cache hit/miss
+- [ ] checkpointing
+- [ ] resume
+- [ ] invalidation
+- [ ] downstream invalidation
+- [ ] sidecar metadata
+- [ ] reproducibility metadata
+- [ ] generation seed
+- [ ] provider/model/version metadata
+- [ ] timing
+- [ ] peak memory
+- [ ] validation result
+- [ ] source assets
+- [ ] local preview player
+- [ ] timeline scrubber / current timestamp
+- [ ] visual element selection
+- [ ] timestamped review feedback
+- [ ] review feedback persistence
+- [ ] preview reload after rebuild
+- [ ] tests
+- [ ] Agent review #1
+- [ ] Fix
+- [ ] Agent review #2
+- [ ] Fix
+- [ ] Evidence
+- [ ] Docs
+- [ ] Commit
+
+## Target asset layout
+
+```text
+shot-017.mp4
+shot-017.json
+```
+
+---
+
+# PHASE 11 — AUDIO / TIMESTAMP PIPELINE
+
+## Goal
+
+Treat audio as a first-class timeline input.
+
+Pipeline:
+
+```text
+script
+→ TTS
+→ word timestamps
+→ timeline
+→ avatar mouth animation
+→ subtitles
+→ visual emphasis
+```
+
+## TODO
+
+- [ ] AudioAsset
+- [ ] VoiceProvider interface
+- [ ] ASR interface
+- [ ] word timestamp representation
+- [ ] SRT support
+- [ ] subtitle timing
+- [ ] voice timing
+- [ ] audio duration validation
+- [ ] audio/video sync
+- [ ] timestamp normalization
+- [ ] timestamp-to-element/event mapping contract
+- [ ] deterministic mock TTS
+- [ ] external worker interface
+- [ ] local ASR provider interface
+- [ ] Apple TTS integration boundary
+- [ ] tests
+- [ ] Agent review #1
+- [ ] Fix
+- [ ] Agent review #2
+- [ ] Fix
+- [ ] Evidence
+- [ ] Docs
+- [ ] Commit
+
+---
+
+# PHASE 12 — TUI CONTROL PLANE
+
+## Goal
+
+Create the OpenCode-like terminal control room.
+
+The TUI must not contain business logic that belongs in core.
+
+## TODO
+
+- [ ] TUI application shell
+- [ ] tabs
+- [ ] project view
+- [ ] plan view
+- [ ] shots view
+- [ ] timeline view
+- [ ] assets view
+- [ ] models view
+- [ ] logs view
+- [ ] preview view
+- [ ] current preview timestamp
+- [ ] selected visual element
+- [ ] review feedback capture
+- [ ] Send to AI action
+- [ ] ChangeSet review/apply/cancel
+- [ ] resource status
+- [ ] event subscription
+- [ ] task progress
+- [ ] cancellation
+- [ ] responsive behavior
+- [ ] keyboard navigation
+- [ ] errors
+- [ ] agent status
+- [ ] tests where practical
+- [ ] Agent review #1
+- [ ] Fix
+- [ ] Agent review #2
+- [ ] Fix
+- [ ] Evidence
+- [ ] Docs
+- [ ] Commit
+
+## Important
+
+The TUI is a client/control plane.
+
+It should consume state/events instead of owning renderer/provider logic.
+
+---
+
+# PHASE 13 — DIRECTOR CHAT / CHANGESETS
+
+## Goal
+
+Allow natural-language editing of a video project.
+
+Pipeline:
+
+```text
+User
+→ Director Chat
+→ Intent
+→ ChangeSet
+→ Review/Apply
+→ Invalidate
+→ Rebuild
+```
+
+## TODO
+
+- [ ] chat request model
+- [ ] intent model
+- [ ] ChangeSet model
+- [ ] visual review feedback input
+- [ ] element/timestamp-aware intent
+- [ ] preview changes
+- [ ] Apply
+- [ ] Cancel
+- [ ] validation
+- [ ] affected-shot calculation
+- [ ] cache invalidation
+- [ ] resource impact calculation
+- [ ] review mode
+- [ ] automatic mode
+- [ ] audit trail
+- [ ] tests
+- [ ] Agent review #1
+- [ ] Fix
+- [ ] Agent review #2
+- [ ] Fix
+- [ ] Evidence
+- [ ] Docs
+- [ ] Commit
+
+## Visual editing loop
+
+The Director/ChangeSet system must accept both normal natural-language requests and feedback captured from the preview player.
+
+Target:
+
+```text
+Preview
+→ selected element / timestamp
+→ ReviewFeedback
+→ Director / Intent
+→ ChangeSet
+→ Review or Apply
+→ affected-shot calculation
+→ cache invalidation
+→ incremental rebuild
+→ Preview
+```
+
+Do not make this Claude-specific. The user-facing action should be conceptually `Send to AI`, while the configured Director/provider decides which model handles the request.
+
+The visual player is an inspection surface. It must not become the source of truth.
+
+A request such as:
+
+```text
+At 00:13.42, move this subtitle 0.5 seconds earlier.
+```
+
+should retain the structured context:
+
+```text
+project
+shot
+element
+timestamp
+user request
+```
+
+so the Director does not need to infer the target from pixels.
+
+The implementation should prefer deterministic element identity supplied by the renderer/Remotion integration over computer vision or LLM guessing.
+
+## Review mode
+
+Eventually support:
+
+```text
+Review Before Submit = OFF
+
+→ execute automatically
+```
+
+and:
+
+```text
+Review Before Submit = ON
+
+→ show plan/changes/cost/time
+→ Approve
+→ Edit
+→ Cancel
+```
+
+---
+
+# Visual Review / Editing Cross-Phase Invariant
+
+This capability is intentionally distributed across existing phases rather than becoming a new phase.
+
+The minimum architectural chain is:
+
+```text
+Phase 01  stable project/shot/timeline/element identity
+Phase 03  renderer emits inspectable element metadata
+Phase 10  preview + cache + incremental rebuild
+Phase 11  timestamps can map to temporal events
+Phase 12  TUI exposes the review/control surface
+Phase 13  feedback becomes Intent / ChangeSet
+```
+
+Both Web and TUI clients must consume the same core contracts.
+
+### Required invariants
+
+1. Project/Timeline remains the source of truth.
+2. Rendered MP4 is an artifact, not authoritative state.
+3. Visual elements have stable IDs whenever their identity is known by the renderer.
+4. User feedback carries timestamp and target context whenever available.
+5. AI proposes intent/changes; deterministic core code validates and applies them.
+6. Review Before Submit semantics are shared with normal Director editing.
+7. Only affected shots should be invalidated/rebuilt where dependency information permits.
+8. The feature must not be coupled to Claude or any specific AI provider.
+9. The TUI and Web preview must not implement separate mutation/business-logic paths.
+10. Computer vision is a fallback for cases where deterministic renderer metadata cannot identify the target; it is not the default mechanism.
+
+---
+
+# PHASE 14 — LOCAL AI PROVIDERS
+
+## Goal
+
+Add real local providers behind the established interfaces.
+
+Potential providers:
+
+```text
+InvokeAI
+FreeVideo
+OpenMotion
+Wan
+Qwen ASR
+Whisper/faster-whisper
+Gemma
+Qwen
+Ollama
+```
+
+Do not assume every provider will run efficiently on M1 Pro 16GB.
+
+Provider capability declarations must include hardware requirements.
+
+## TODO
+
+- [ ] provider capability registry entries
+- [ ] local worker protocol
+- [ ] process lifecycle
+- [ ] model lifecycle
+- [ ] resource leasing
+- [ ] preview generation
+- [ ] cancellation
+- [ ] failure handling
+- [ ] metadata
+- [ ] validation
+- [ ] provider-specific tests
+- [ ] Mac compatibility notes
+- [ ] Agent review #1
+- [ ] Fix
+- [ ] Agent review #2
+- [ ] Fix
+- [ ] Evidence
+- [ ] Docs
+- [ ] Commit
+
+---
+
+# PHASE 15 — CLOUD PROVIDERS
+
+## Goal
+
+Add cloud generation behind the same provider contracts.
+
+Potential providers:
+
+```text
+Veo
+Runway
+future providers
+```
+
+## TODO
+
+- [ ] credential abstraction
+- [ ] configuration
+- [ ] request serialization
+- [ ] async jobs
+- [ ] polling
+- [ ] cancellation where supported
+- [ ] retry
+- [ ] rate limits
+- [ ] cost metadata
+- [ ] latency metadata
+- [ ] provider status
+- [ ] result download
+- [ ] checksum
+- [ ] validation
+- [ ] secret-safe logging
+- [ ] tests
+- [ ] Agent review #1
+- [ ] Fix
+- [ ] Agent review #2
+- [ ] Fix
+- [ ] Evidence
+- [ ] Docs
+- [ ] Commit
+
+---
+
+# PHASE 16 — END-TO-END AUTONOMOUS PIPELINE
+
+## Goal
+
+Connect everything.
+
+Target:
+
+```text
+Prompt
+→ Director
+→ VideoPlan
+→ Shot Intelligence
+→ Decision Engine
+→ Provider Router
+→ Resource Planner
+→ Generation
+→ Validation
+→ Timeline
+→ Render
+→ MP4
+```
+
+## TODO
+
+- [ ] end-to-end orchestration
+- [ ] deterministic-only path
+- [ ] local-AI path
+- [ ] cloud path
+- [ ] mixed-provider path
+- [ ] preview path
+- [ ] approval path
+- [ ] cancellation
+- [ ] resume
+- [ ] retry
+- [ ] partial failure recovery
+- [ ] incremental rebuild
+- [ ] full project integration test
+- [ ] sample project
+- [ ] performance baseline
+- [ ] Agent review #1
+- [ ] Fix
+- [ ] Agent review #2
+- [ ] Fix
+- [ ] Evidence
+- [ ] Docs
+- [ ] Commit
+
+## Required milestone
+
+A real user prompt should be capable of producing a valid video artifact through the full system.
+
+---
+
+# PHASE 17 — PERFORMANCE / RELIABILITY / PACKAGING
+
+## Goal
+
+Make the system reliable enough for serious use.
+
+## TODO
+
+- [ ] profiling
+- [ ] memory profiling
+- [ ] CPU profiling
+- [ ] concurrency profiling
+- [ ] resource scheduler tuning
+- [ ] startup optimization
+- [ ] provider startup timing
+- [ ] model load timing
+- [ ] cache effectiveness
+- [ ] failure recovery
+- [ ] structured logs
+- [ ] metrics
+- [ ] tracing strategy
+- [ ] deterministic test suite
+- [ ] race tests
+- [ ] stress tests
+- [ ] large project test
+- [ ] packaging
+- [ ] macOS binary
+- [ ] Linux binary
+- [ ] configuration
+- [ ] CLI
+- [ ] TUI startup
+- [ ] Agent review #1
+- [ ] Fix
+- [ ] Agent review #2
+- [ ] Fix
+- [ ] Evidence
+- [ ] Docs
+- [ ] Commit
+
+Do not optimize based on intuition alone.
+
+Profile first.
+
+---
+
+# PHASE 18 — PUBLIC REPOSITORY / RELEASE READINESS
+
+## Goal
+
+Prepare the repository for public GitHub release.
+
+Target:
+
+```text
+github.com/manish96170/<repo>
+```
+
+## TODO
+
+- [ ] final architecture review
+- [ ] security review
+- [ ] dependency review
+- [ ] license review
+- [ ] README
+- [ ] installation
+- [ ] quickstart
+- [ ] architecture diagram
+- [ ] provider documentation
+- [ ] local hardware limitations
+- [ ] configuration docs
+- [ ] development docs
+- [ ] contributing guide
+- [ ] issue templates if useful
+- [ ] examples
+- [ ] sample project
+- [ ] sample provider
+- [ ] sample deterministic render
+- [ ] remove secrets
+- [ ] remove private data
+- [ ] remove large artifacts
+- [ ] check git history
+- [ ] build matrix
+- [ ] final test suite
+- [ ] final review #1
+- [ ] fix
+- [ ] final review #2
+- [ ] fix
+- [ ] final security review
+- [ ] final docs
+- [ ] release commit
+
+Do not publish until repository hygiene is confirmed.
+
+---
+
+# 21. Parallel Agent Work
+
+Parallel work is encouraged only when boundaries are clear.
+
+Good parallelization:
+
+```text
+Agent A → contracts
+Agent B → documentation
+Agent C → test strategy
+Agent D → provider research
+```
+
+Bad parallelization:
+
+```text
+Agent A → edits Project model
+Agent B → edits same Project model
+Agent C → changes same interfaces
+```
+
+When multiple agents modify overlapping code, use Git worktrees.
+
+Example:
+
+```text
+~/video-factory/
+~/worktrees/video-foundation/
+~/worktrees/video-renderer/
+~/worktrees/video-provider/
+```
+
+Never assume two agents can safely edit the same working tree concurrently.
+
+---
+
+# 22. Agent Roles
+
+The main session may delegate:
+
+## Architect
+
+Reviews boundaries, interfaces, dependencies, long-term extensibility.
+
+## Implementer
+
+Writes the requested phase code.
+
+## Code Reviewer
+
+Finds correctness and maintainability issues.
+
+## Performance Reviewer
+
+Looks for:
+
+- unnecessary allocations
+- memory growth
+- excessive serialization
+- blocking operations
+- bad concurrency
+- resource leaks
+- unnecessary processes
+- poor caching
+
+## Reliability Reviewer
+
+Looks for:
+
+- cancellation failures
+- deadlocks
+- races
+- retry storms
+- orphaned workers
+- corrupt state
+- partial failure behavior
+
+## Security Reviewer
+
+Looks for:
+
+- command injection
+- unsafe process execution
+- secret leakage
+- path traversal
+- untrusted provider data
+- unsafe file writes
+- credential exposure
+
+## Test Engineer
+
+Finds missing tests and creates deterministic fixtures.
+
+---
+
+# 23. Main Session Agent Protocol
+
+For every phase:
+
+## Step A — Understand
+
+```text
+Read:
+- this PHASES.md
+- AGENTS.md
+- ARCHITECTURE.md
+- DECISIONS.md
+- current phase docs
+- recent commits
+```
+
+## Step B — Inspect
+
+Run:
+
+```text
+git status
+git log --oneline -n 10
+find relevant source directories
+```
+
+Do not assume the repository matches the roadmap exactly.
+
+## Step C — Plan
+
+Create a short internal phase plan.
+
+Do not rewrite the entire roadmap.
+
+## Step D — Implement
+
+Delegate where useful.
+
+Agents should receive:
+
+- phase goal
+- exact scope
+- constraints
+- expected files
+- tests required
+- non-goals
+
+## Step E — Self-review
+
+The main session reviews:
+
+```text
+git diff
+```
+
+and the architecture impact.
+
+## Step F — Test
+
+At minimum:
+
+```text
+go test ./...
+go test -race ./...
+go vet ./...
+go build ./...
+```
+
+Use narrower commands during iteration, but the phase gate requires the relevant final checks.
+
+## Step G — Review agent #1
+
+Use a different model from the implementation agent.
+
+Give it:
+
+```text
+- phase goal
+- commit/diff
+- architecture docs
+- test results
+- explicit request for adversarial review
+```
+
+Reviewer must not modify code unless explicitly asked.
+
+## Step H — Fix
+
+Main session decides which findings are valid.
+
+Do not blindly implement all reviewer suggestions.
+
+## Step I — Re-test
+
+Run relevant tests again.
+
+## Step J — Review agent #2
+
+Use another different model.
+
+Review the updated state.
+
+## Step K — Fix and re-test
+
+Resolve valid findings.
+
+## Step L — Evidence
+
+Write review files.
+
+## Step M — Documentation
+
+Update only documentation affected by implementation.
+
+## Step N — Checklist
+
+Mark TODOs complete.
+
+## Step O — Commit
+
+Create the phase commit.
+
+## Step P — Verify
+
+Run:
+
+```text
+git status
+git log --oneline -n 3
+```
+
+Ensure the working tree is clean unless there is an explicitly documented next-phase change.
+
+---
+
+# 24. Review Prompt Template
+
+Use this when invoking a reviewer.
+
+```text
+You are the independent reviewer for Phase <N> of the Video Factory project.
+
+You are NOT the implementation agent.
+
+Review the current repository state and the phase diff against:
+- PHASES.md
+- AGENTS.md
+- ARCHITECTURE.md
+- DECISIONS.md
+- phase requirements
+
+Review for:
+
+1. correctness
+2. architecture
+3. API boundaries
+4. hidden coupling
+5. concurrency
+6. cancellation
+7. resource lifecycle
+8. memory usage
+9. error handling
+10. tests
+11. race conditions
+12. portability
+13. macOS/Apple Silicon compatibility where relevant
+14. future provider extensibility
+15. Lambda/control-plane compatibility
+16. security
+17. documentation accuracy
+
+Do not make changes.
+
+Return:
+
+- BLOCKER findings
+- HIGH findings
+- MEDIUM findings
+- LOW findings
+- positive observations
+- missing tests
+- architecture concerns
+- exact file/line references
+- recommended fixes
+
+If no findings exist, say exactly why you believe the implementation satisfies the phase requirements.
+
+This review will be saved as formal review evidence.
+```
+
+---
+
+# 25. Implementation Agent Prompt Template
+
+```text
+You are implementing Phase <N> of the Video Factory project.
+
+Read PHASES.md first.
+
+Scope:
+<phase scope>
+
+Rules:
+- Follow the architecture in PHASES.md.
+- Do not implement future-phase functionality unless required for a clean boundary.
+- Keep core in Go.
+- Do not embed Python.
+- Keep provider-specific code behind interfaces.
+- Use context.Context for cancellable operations.
+- Prefer small interfaces.
+- Avoid global mutable state.
+- Write tests with the implementation.
+- Do not commit unless explicitly instructed.
+- Do not push.
+- Do not introduce secrets.
+- Do not silently change architecture.
+
+Before finishing:
+- run relevant tests
+- inspect git diff
+- report files changed
+- report tests run
+- report assumptions
+- report unresolved issues
+```
+
+---
+
+# 26. Context-Rollover Handoff Template
+
+When context reaches approximately 80%, create:
+
+```text
+docs/handoffs/next-session-phase-XX.md
+```
+
+Use:
+
+```markdown
+# Next Session Handoff
+
+## Current phase
+
+Phase XX — <name>
+
+## Current status
+
+<summary>
+
+## Completed
+
+- ...
+
+## Incomplete
+
+- ...
+
+## Current commit
+
+<hash>
+
+## Working tree
+
+<clean/dirty + files>
+
+## Tests
+
+- ...
+
+## Reviews
+
+### Reviewer 1
+- model:
+- status:
+- findings:
+
+### Reviewer 2
+- model:
+- status:
+- findings:
+
+## Documentation updated
+
+- ...
+
+## Known issues
+
+- ...
+
+## Exact next actions
+
+1. ...
+2. ...
+3. ...
+
+## Do not redo
+
+- ...
+
+## Next-session prompt
+
+Continue Phase XX from this handoff.
+
+First:
+1. Read PHASES.md.
+2. Read this handoff.
+3. Inspect git status and recent commits.
+4. Verify the current implementation before changing anything.
+5. Continue only from the incomplete TODOs.
+6. Do not redo completed work.
+7. Preserve the two-review requirement.
+8. Complete the phase gate and commit the phase.
+```
+
+---
+
+# 27. TODO State Rules
+
+Use these states:
+
+```text
+[ ] NOT STARTED
+[-] IN PROGRESS
+[x] DONE
+[!] BLOCKED
+```
+
+Do not mark an item `[x]` merely because code exists.
+
+It is `[x]` only when verified.
+
+A blocked item must include a reason in the phase notes.
+
+---
+
+# 28. Evidence Requirements
+
+For each phase maintain evidence:
+
+```text
+docs/phases/phase-XX.md
+```
+
+Recommended content:
+
+```markdown
+# Phase XX — <name>
+
+## Goal
+
+## Implemented
+
+## Design decisions
+
+## Files changed
+
+## Tests
+
+## Review 1
+
+## Review 2
+
+## Findings resolved
+
+## Known limitations
+
+## Commit
+
+## Follow-ups
+```
+
+This should be concise.
+
+Do not duplicate the entire source code or roadmap.
+
+---
+
+# 29. First Milestone
+
+The first meaningful product milestone is:
+
+```text
+Manual VideoPlan
+    ↓
+3 deterministic shots
+    ↓
+Deterministic renderer
+    ↓
+MP4
+```
+
+The second milestone:
+
+```text
+Prompt
+    ↓
+Director
+    ↓
+VideoPlan
+    ↓
+Deterministic renderer
+    ↓
+MP4
+```
+
+The third milestone:
+
+```text
+Prompt
+    ↓
+Director
+    ↓
+Shot Intelligence
+    ↓
+Decision Engine
+    ↓
+Deterministic / AI Provider
+    ↓
+Validation
+    ↓
+MP4
+```
+
+The fourth milestone:
+
+```text
+TUI
+    ↓
+Director Chat
+    ↓
+Plan
+    ↓
+Preview
+    ↓
+Approve
+    ↓
+Final
+```
+
+---
+
+# 30. Definition of "Production-Ready Architecture"
+
+The architecture is considered structurally successful when:
+
+```text
+A new video provider
+```
+
+can be added without changing:
+
+```text
+Project model
+Timeline model
+Director
+TUI
+Decision Engine
+Resource Manager
+```
+
+and:
+
+```text
+A new flow
+```
+
+can be added without rewriting:
+
+```text
+Provider Router
+Renderer
+TUI
+Resource Manager
+```
+
+and:
+
+```text
+A new framing
+```
+
+can be added without changing:
+
+```text
+Director core
+Provider implementations
+```
+
+and:
+
+```text
+A new model
+```
+
+can be registered through capabilities/configuration without embedding model-specific logic throughout the codebase.
+
+---
+
+# 31. Final Quality Principles
+
+The main session must repeatedly ask:
+
+### Is this deterministic?
+
+If yes, prefer deterministic code.
+
+### Is AI actually required?
+
+If no, don't use AI.
+
+### Can we use a cheaper model?
+
+If yes, use the cheaper model.
+
+### Can the work be previewed first?
+
+If yes, preview first.
+
+### Can the result be cached?
+
+If yes, cache it.
+
+### Can only the affected shot be rebuilt?
+
+If yes, do not rebuild the whole video.
+
+### Can the operation exceed memory?
+
+If yes, Resource Manager must prevent it.
+
+### Can the worker be cancelled?
+
+If no, fix the lifecycle.
+
+### Can this provider be replaced?
+
+If no, the abstraction is probably wrong.
+
+### Can another agent understand this code?
+
+If no, simplify/document it.
+
+### Can this package run without a machine-specific environment?
+
+If no, identify whether that coupling is genuinely required.
+
+---
+
+# 32. Current Execution State
+
+The main session must maintain this section as the authoritative high-level progress tracker.
+
+```text
+[x] PHASE 00 — Foundation / Contracts
+[ ] PHASE 01 — Project State / Timeline
+[ ] PHASE 02 — Event System
+[ ] PHASE 03 — Deterministic Renderer
+[ ] PHASE 04 — Flows / Framing / Primitives
+[ ] PHASE 05 — Director / Video Planning
+[ ] PHASE 06 — Decision Engine
+[ ] PHASE 07 — Provider System / Router
+[ ] PHASE 08 — Model Manager / Resource Planner
+[ ] PHASE 09 — Validation / Shot Intelligence
+[ ] PHASE 10 — Preview / Checkpoint / Cache / Visual Review
+[ ] PHASE 11 — Audio / Timestamp / Temporal Intelligence
+[ ] PHASE 12 — TUI Control Plane / Visual Review
+[ ] PHASE 13 — Director Chat / ChangeSets / Visual Editing
+[ ] PHASE 14 — Local AI Providers
+[ ] PHASE 15 — Cloud Providers
+[ ] PHASE 16 — End-to-End Autonomous Pipeline
+[ ] PHASE 17 — Performance / Reliability / Packaging
+[ ] PHASE 18 — Public Repository / Release Readiness
+```
+
+---
+
+# 33. How the Main Session Should Start
+
+On the first session, do NOT immediately start coding.
+
+First perform:
+
+```text
+1. Inspect repository.
+2. Determine whether it is empty/new or contains existing work.
+3. Read existing docs.
+4. Read PHASES.md.
+5. Establish the Go module.
+6. Create/update AGENTS.md.
+7. Create/update ARCHITECTURE.md.
+8. Create/update DECISIONS.md.
+9. Create/update ROADMAP.md.
+10. Confirm Phase 00 scope.
+11. Delegate implementation where useful.
+12. Implement Phase 00.
+13. Run tests.
+14. Review with two different agents/models.
+15. Resolve findings.
+16. Write evidence.
+17. Mark Phase 00 complete.
+18. Commit Phase 00.
+19. Only then start Phase 01 if context and quality allow.
+```
+
+The main session may complete multiple phases in one context if it remains safe.
+
+Do not sacrifice review quality merely to finish more phases.
+
+---
+
+# 34. Session Completion Protocol
+
+Before ending any session:
+
+```text
+1. Check current phase.
+2. Check PHASES.md TODO state.
+3. Inspect git status.
+4. Inspect recent commits.
+5. Run tests appropriate to current state.
+6. Determine whether documentation is stale.
+7. Update documentation if necessary.
+8. If context is near 80%, create handoff.
+9. If a phase is complete, finish both reviews and commit it.
+10. Leave a clean working tree whenever practical.
+11. Produce the next-session prompt if work remains.
+```
+
+The final session message should state:
+
+```text
+Completed:
+- ...
+
+Tests:
+- ...
+
+Reviews:
+- ...
+
+Commit:
+- ...
+
+Remaining:
+- ...
+
+Next session:
+- ...
+```
+
+---
+
+# 35. The Golden Rule
+
+Do not optimize for:
+
+```text
+number of files created
+number of phases completed
+number of agents used
+amount of code
+```
+
+Optimize for:
+
+```text
+correct architecture
+small understandable components
+deterministic behavior
+safe resource usage
+fast iteration
+reliable cancellation
+provider independence
+incremental builds
+strong tests
+independent review
+reproducibility
+```
+
+The desired system is:
+
+```text
+small core
++
+strong contracts
++
+deterministic rendering
++
+pluggable providers
++
+resource-aware execution
++
+cheap previews
++
+incremental rebuilds
++
+independent reviews
++
+excellent TUI
+```
+
+That is the Video Factory.

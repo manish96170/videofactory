@@ -586,3 +586,150 @@ go vet ./...
 go test ./...
 go test -race ./...
 ```
+
+Committed as `65a5441` ("phase(04): implement flow/framing/primitive
+registries"). Evidence: `docs/phases/phase-04.md`,
+`docs/reviews/phase-04-review-terra.md`,
+`docs/reviews/phase-04-review-sol6.md`.
+
+## Phase 05 — Director / Video Planning
+
+### Package layout
+
+```text
+director/
+├── director.go              Director interface, PlanRequest/PlanResult, AssetRequirement
+├── interpreter.go           PromptInterpreter — the optional LLM adapter seam
+├── decompose.go             fixed keyword/reading-pace heuristics (no AI)
+└── fixture.go               FixtureDirector.Plan — the deterministic implementation
+```
+
+Also: `project.ValidatePlan(projectID, plan)` was exported from Phase
+01's `project` package so a Director can validate a `VideoPlan` before
+attachment to a `Project`. The public wrapper requires a nonempty
+expected project ID and matching `plan.ProjectID`, then reuses the
+existing internal structural checks. It does not look up project storage.
+
+### Pipeline: Prompt → Director → VideoPlan
+
+`FixtureDirector.Plan` implements PHASES.md Phase 05's pipeline
+end to end, with no AI model:
+
+1. **Flow selection:** an explicit `PlanRequest.FlowID` wins; else a
+   `PromptInterpreter`'s suggestion (if configured); else a simple
+   keyword check over the whole prompt (`mentionsAvatar` →
+   `developer-explainer`, else `code-tutorial` — both from Phase 04's
+   `FlowRegistry`).
+2. **Framing selection:** an explicit `PlanRequest.FramingID` wins;
+   else the selected Flow's `DefaultFramingID` (Phase 04); else
+   `fullscreen`.
+3. **Shot decomposition:** the prompt is split into sentences
+   (`splitSentences`); a `PromptInterpreter`'s `Shots` hints are used
+   instead if nonempty. Empty lists permit fallback; nonempty lists
+   containing blank/whitespace-only Text are rejected, not silently
+   discarded or replaced. Text is trimmed on a local hint copy; neither
+   supplied hints nor empty-list backing arrays are mutated by fallback.
+4. **Deterministic-vs-AI intent:** an AVATAR hint or avatar keyword selects
+   `DeveloperAvatar`, normalizes category to AVATAR, and sets
+   `Shot.Deterministic = false`, even if another category was suggested.
+   Other shots use `Background`+`Text` with deterministic intent; missing
+   categories are inferred, and explicit non-avatar categories retained.
+5. **Shot duration planning:** a fixed reading-pace heuristic
+   (`estimateDuration`, 2.5 words/sec, 1.5s floor) — not a model
+   estimate.
+6. **Asset requirements:** every AI-capable shot gets an
+   `AssetRequirement` naming what it needs (e.g. "generated-video");
+   deterministic shots need none. Later phases (Shot Intelligence/
+   Phase 09, Provider Router/Phase 07) are expected to resolve these —
+   the Director only names them.
+7. **Provider capability requirements:** every primitive's `Tags` are
+   looked up in Phase 04's `PrimitiveRegistry` and aggregated (deduped,
+   sorted) into `PlanResult.RequiredCapabilities` — direct reuse of the
+   Phase 00/04 capability-tag pattern, not a parallel one.
+8. **Plan validation:** `project.ValidatePlan` runs before `Plan`
+   returns, so a structurally broken plan is caught immediately rather
+   than discovered later.
+
+Context is checked at entry, after interpreter execution, during fallback
+and shot construction, and before returning success. Adapter errors retain
+their identity through wrapping. Determinism describes planning structure:
+generated IDs and timestamps are intentionally fresh for each call.
+
+### The optional LLM adapter seam
+
+PHASES.md Phase 05's "Important" note — "Do not tightly couple the
+Director to Claude, Qwen, Gemini, or any single model" — is satisfied
+by `PromptInterpreter`: the *only* seam `FixtureDirector` uses for
+LLM-assisted hints (a suggested Flow and/or shot segmentation). No
+production implementation exists yet; `FixtureDirector` works
+correctly with none configured (`WithPromptInterpreter` is optional),
+which is also how its own tests exercise both paths
+(`TestPlanFallsBackToHeuristicsWhenInterpreterHasNoShots`).
+
+The Director does not serialize interpreter calls. For concurrent use,
+the caller must supply a concurrency-safe interpreter and keep its returned
+values stable while consumed. No interface change or adapter infrastructure
+is introduced here; tests exercise 24 callers with a stateless interpreter.
+
+### Second Milestone: Prompt → Director → VideoPlan → Deterministic renderer → MP4
+
+`TestSecondMilestonePromptToRenderedMP4` is PHASES.md section 29's
+Second Milestone, literally: a prompt goes through `FixtureDirector`,
+`render.BuildSequentialTimeline`, `render.FFmpegRenderer.RenderShot`
+(Phase 03), and `render.ComposeTimeline`, producing one real, probed
+MP4 — with no avatar keywords, so every shot is deterministic and
+actually renders today. A companion test,
+`TestSecondMilestoneRejectsNonDeterministicPlanAtRenderTime`, confirms
+the boundary this phase deliberately leaves open: the Director *can*
+plan a `DeveloperAvatar` shot (deciding AI should be used), but nothing
+in this module can render it yet, and `RenderShot` fails loudly rather
+than silently skipping or faking it — AI provider implementations are
+Phase 14/15.
+
+The text milestone checks FFmpeg/FFprobe, `drawtext`, and a discovered
+default font, skipping if prerequisites are unavailable. Avatar rejection
+asserts the unsupported-primitive error before native execution and also
+runs with an empty PATH; it needs no native tools or fonts. The final lead
+gate executed the real milestone uncached (not skipped).
+Prior-session manual frame inspection is recorded in the historical handoff,
+not claimed as a new documentation-agent visual test.
+
+### Known limitations (Phase 05)
+
+- `splitSentences`/keyword matching are simple, fixed rules — not NLP,
+  not an AI classifier. A prompt with no `.`/`!`/`?` becomes one shot;
+  highly ambiguous prompts may categorize imprecisely. This is by
+  design for a "deterministic fixture Director," not a limitation to
+  fix later with more string-matching cleverness — a real
+  `PromptInterpreter` is the intended upgrade path.
+- No production `PromptInterpreter` implementation exists; model-backed
+  assistance remains later-phase work behind the same seam.
+- `AssetRequirements`/`RequiredCapabilities` are produced but not acted
+  on by anything yet (Phase 07's Provider Router, Phase 09's Shot
+  Intelligence).
+- Durations have a floor but no cap. Non-avatar CODE/TERMINAL categories
+  still use Background+Text, not specialized editor/terminal visuals.
+- Framing selection is metadata only: the Director does not call
+  `AssignSlots`, apply bounds, or promise visible framing in this milestone.
+- Concurrent use requires a concurrency-safe caller-supplied interpreter;
+  fresh IDs/timestamps mean structural, not byte-identical, determinism.
+
+### Build / test gate (Phase 05)
+
+```text
+go build ./...
+go vet ./...
+go test -count=1 ./...
+go test -race -count=1 ./...
+```
+
+Final lead build/vet/uncached unit and integration/race gate: PASS;
+formatting clean. Luna and Astra approved the final code sequentially
+after all findings were fixed and retested. Coverage includes full normalized result
+comparison with 17 sensitivity cases, exact mixed capability ordering/
+deduplication, runtime registry selection/defaults/precedence, planning JSON
+round-trips, concurrent callers, and standalone project-linkage rejection.
+Evidence: `docs/phases/phase-05.md`,
+`docs/reviews/phase-05-review-luna.md`,
+`docs/reviews/phase-05-review-astra.md`. Phase commit:
+`phase(05): implement director / video planning` (see repository history).

@@ -702,3 +702,96 @@ structure; bounds validation can't admit non-finite geometry; the
 primitive-capability/renderer-behavior consistency claim is backed by
 a test that would fail if they diverged; and the composition tests
 would catch a slot-bounds mix-up that the original versions could not.
+
+---
+
+## ADR-018: `FixtureDirector` — keyword/reading-pace heuristics, no AI, with an optional `PromptInterpreter` seam
+
+**Date:** 2026-10-09
+**Status:** Accepted
+
+**Context:** Phase 05 asks for a Director that turns a prompt into a
+`domain.VideoPlan`, with an explicit instruction: "Do not tightly
+couple the Director to Claude, Qwen, Gemini, or any single model." It
+also asks for a "deterministic fixture Director" and an "optional LLM
+adapter interface" as separate TODO items.
+
+**Decision:**
+- `FixtureDirector` is the only `Director` implementation in this
+  module. It decomposes a prompt into shots using fixed, documented
+  rules — sentence-splitting on `.`/`!`/`?`, a fixed reading-pace
+  constant (2.5 words/sec) for duration, and avatar keyword matching
+  (regex word-boundaries to avoid false positives like "me" inside
+  "demo") to decide whether a shot needs an AI avatar
+  or can be deterministic Background+Text. None of this calls a model,
+  a network, or any external process.
+- `PromptInterpreter` is the *only* seam through which a smarter
+  Director could use LLM assistance (a suggested Flow and/or shot
+  hints). `FixtureDirector` optionally accepts one
+  (`WithPromptInterpreter`) and merges its suggestions with the
+  deterministic fallback for anything the interpreter didn't resolve,
+  rather than requiring an interpreter or hard-coding any particular
+  one. Empty hint lists permit fallback; supplied blank hints are errors,
+  not missing suggestions. No production `PromptInterpreter` exists yet;
+  model-backed assistance is later-phase work behind this seam,
+  consistent with "LLMs propose. Decision models classify.
+  Deterministic code decides." (PHASES.md section 1).
+- `AssetRequirement`/`RequiredCapabilities` reuse Phase 00/04's
+  capability-tag pattern (`PrimitiveRegistry.Get(type).Tags`) rather
+  than inventing a parallel vocabulary: the Director aggregates what
+  capabilities a plan's primitives declare, it doesn't decide how to
+  satisfy them (that's Phase 07's Provider Router).
+- `project.ValidatePlan` was exported from Phase 01 so a Director can
+  validate a `VideoPlan` before attachment to a `Project`. Its public
+  boundary requires a nonempty expected project ID and matching
+  `plan.ProjectID`, then delegates structural checks to internal
+  `validatePlan`. It does not verify existence in project storage.
+  `FixtureDirector.Plan` calls it before returning.
+
+**Consequence:** The Second Milestone (PHASES.md section 29) — Prompt
+→ Director → VideoPlan → Deterministic renderer → MP4 — works
+end-to-end, with actual uncached rendering/probing reported by the lead
+for `TestSecondMilestonePromptToRenderedMP4`. Manual frame inspection
+is prior-session evidence in `docs/handoffs/next-session-phase-05.md`,
+not a new inspection by the documentation agent. A companion test confirms
+the Director/renderer boundary: a planned `DeveloperAvatar` shot *fails* to
+render (Phase 03's renderer doesn't implement AI primitives), rather
+than being silently skipped or faked.
+
+### Amendment (2026-10-09) — review hardening and evidence
+
+Luna found two HIGH issues (lost interpreter cancellation, blank hints)
+and two MEDIUM issues (avatar category inconsistency, incomplete native
+test prerequisites). Astra's sequential review of the fixed/retested state
+found MEDIUM empty expected project ID acceptance and LOW weak determinism/
+capability assertions. All fixes are implemented and verified; Luna's
+final approval followed by Astra's final approval closed the findings.
+The final lead full build/vet/uncached test/race gate passes.
+
+- Check context after interpretation, during construction/fallback, and
+  before success; preserve wrapped adapter error identity. An interpreter
+  must itself cooperate with context; the core does not forcibly stop it.
+- Trim hint text locally and reject blank entries in a nonempty list with
+  an indexed error and no partial/fallback result. Keep empty-list fallback,
+  but allocate independently to avoid overwriting interpreter spare capacity
+  (an additional regression found during fixes). Never mutate returned hints.
+- Retain conservative avatar intent: either AVATAR category or avatar
+  keyword forces AVATAR category, primitive, flag, and requirements together.
+- The public validation wrapper now guards the expected project identity;
+  retain existing internal checks instead of changing aggregate validation.
+- Text integration tests check tools, `drawtext`, and discovered font;
+  unsupported-avatar rejection asserts its specific error without tools/fonts.
+- Compare complete normalized `PlanResult` values, canonicalizing only
+  generated IDs/references and timestamps. Seventeen sensitivity cases keep
+  content, ordering, metadata, and linkage defects visible; mixed capability
+  output is asserted as an exact sorted/deduplicated slice, not a map.
+- Add runtime flow/framing/default/precedence, JSON round-trip, and 24-caller
+  stateless-interpreter tests. Concurrent callers must provide a safe
+  interpreter; no interface, model/vendor, scheduler, or API change is needed.
+
+Structural determinism does not promise identical IDs/timestamps. Framing
+selection remains metadata-only (no `AssignSlots`/bounds application).
+The implementer reports red-before/green-after regressions, including both
+empty-expected-ID cases; the lead independently inspected diffs and
+verified the final gate. See
+`docs/phases/phase-05.md` and the two Phase 05 review records for provenance.

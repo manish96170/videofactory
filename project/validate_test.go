@@ -1,6 +1,7 @@
 package project
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -20,6 +21,58 @@ func TestNewProjectHasStableUniqueIDs(t *testing.T) {
 	}
 	if !a.CreatedAt.Equal(now) || !a.UpdatedAt.Equal(now) {
 		t.Fatalf("expected CreatedAt/UpdatedAt to equal now, got %+v", a)
+	}
+}
+
+func TestValidatePlanStandaloneMatchesEmbeddedValidation(t *testing.T) {
+	now := time.Now()
+	p := validProject(now)
+
+	// A standalone ValidatePlan call on a valid plan must succeed...
+	if err := ValidatePlan(p.ID, *p.Plan); err != nil {
+		t.Fatalf("ValidatePlan() = %v, want nil", err)
+	}
+
+	// ...and must catch the same problems Validate(Project) does when
+	// the plan is embedded, e.g. a mismatched ProjectID.
+	badPlan := *p.Plan
+	badPlan.ProjectID = NewID()
+	if err := ValidatePlan(p.ID, badPlan); err == nil {
+		t.Fatalf("expected ValidatePlan to reject a mismatched ProjectID")
+	}
+
+	// A plan that fails standalone must also fail once embedded.
+	p.Plan = &badPlan
+	if err := Validate(p); err == nil {
+		t.Fatalf("expected Validate(Project) to also reject the same invalid plan once embedded")
+	}
+}
+
+func TestValidatePlanRequiresExpectedProjectLinkage(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		expectedID domain.ID
+		planID     domain.ID
+		wantError  string
+	}{
+		{name: "matching", expectedID: "project", planID: "project"},
+		{name: "mismatched", expectedID: "project", planID: "other-project", wantError: "does not match"},
+		{name: "empty expected with linked plan", planID: "project", wantError: "projectID must not be empty"},
+		{name: "both empty", wantError: "projectID must not be empty"},
+		{name: "empty plan linkage", expectedID: "project", wantError: "does not match"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			plan := *validProject(time.Now()).Plan
+			plan.ProjectID = tc.planID
+			err := ValidatePlan(tc.expectedID, plan)
+			if tc.wantError == "" {
+				if err != nil {
+					t.Fatalf("ValidatePlan: %v", err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), tc.wantError) {
+				t.Fatalf("ValidatePlan error = %v, want %q", err, tc.wantError)
+			}
+		})
 	}
 }
 

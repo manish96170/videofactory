@@ -74,6 +74,20 @@ func validateAssets(assets []domain.Asset) []error {
 	return issues
 }
 
+// ValidatePlan checks a VideoPlan's structural invariants on its own,
+// without requiring a full domain.Project — useful for a Director
+// (Phase 05) that produces a VideoPlan before it's attached to a
+// Project's Plan field. projectID must be non-empty, and plan.ProjectID
+// must match it. It otherwise applies the exact same checks Validate
+// (above) applies to an embedded Plan, so a plan that passes here will
+// also pass once embedded in a Project with a matching ID.
+func ValidatePlan(projectID domain.ID, plan domain.VideoPlan) error {
+	if projectID.IsZero() {
+		return errors.New("project: ValidatePlan projectID must not be empty")
+	}
+	return errors.Join(validatePlan(projectID, plan)...)
+}
+
 func validatePlan(projectID domain.ID, plan domain.VideoPlan) []error {
 	var issues []error
 

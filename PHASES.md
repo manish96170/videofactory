@@ -1515,28 +1515,28 @@ Prompt
 
 ## TODO
 
-- [ ] Director interface
-- [ ] planning request
-- [ ] planning result
-- [ ] flow selection
-- [ ] framing selection
-- [ ] shot decomposition
-- [ ] shot duration planning
-- [ ] deterministic-vs-AI intent
-- [ ] asset requirements
-- [ ] provider capability requirements
-- [ ] plan validation
-- [ ] deterministic fixture Director
-- [ ] optional LLM adapter interface
-- [ ] prompt/version metadata
-- [ ] tests
-- [ ] Agent review #1
-- [ ] Fix
-- [ ] Agent review #2
-- [ ] Fix
-- [ ] Evidence
-- [ ] Docs
-- [ ] Commit
+- [x] Director interface
+- [x] planning request
+- [x] planning result
+- [x] flow selection
+- [x] framing selection
+- [x] shot decomposition
+- [x] shot duration planning
+- [x] deterministic-vs-AI intent
+- [x] asset requirements
+- [x] provider capability requirements
+- [x] plan validation
+- [x] deterministic fixture Director
+- [x] optional LLM adapter interface
+- [x] prompt/version metadata
+- [x] tests
+- [x] Agent review #1 (luna — see `docs/reviews/phase-05-review-luna.md`)
+- [x] Fix (Luna confirmed all findings resolved; uncached full gate passes)
+- [x] Agent review #2 (astra — see `docs/reviews/phase-05-review-astra.md`)
+- [x] Fix (standalone linkage validation and full invariant tests; both reviewers approved sequentially)
+- [x] Evidence (`docs/phases/phase-05.md`, both review records)
+- [x] Docs (architecture/ADR-018/status and historical handoff reconciled)
+- [x] Commit (`phase(05): implement director / video planning`)
 
 ## Important
 
@@ -2884,7 +2884,7 @@ The main session must maintain this section as the authoritative high-level prog
 [x] PHASE 02 — Event System
 [x] PHASE 03 — Deterministic Renderer
 [x] PHASE 04 — Flows / Framing / Primitives
-[ ] PHASE 05 — Director / Video Planning
+[x] PHASE 05 — Director / Video Planning
 [ ] PHASE 06 — Decision Engine
 [ ] PHASE 07 — Provider System / Router
 [ ] PHASE 08 — Model Manager / Resource Planner
@@ -2899,6 +2899,32 @@ The main session must maintain this section as the authoritative high-level prog
 [ ] PHASE 17 — Performance / Reliability / Packaging
 [ ] PHASE 18 — Public Repository / Release Readiness
 ```
+
+Phase 05 resume (2026-10-09): implementation is present; baseline build,
+vet, unit/integration tests, race tests, and formatting checks pass. The
+main session orchestrates bounded agent tasks, independently inspects
+diffs/tests, and owns integration, tracker updates, and the phase commit.
+User-approved sequential reviewers: `luna`
+(`amazon-bedrock/openai.gpt-5.6-luna`), then `astra`
+(`amazon-bedrock/us.openai.gpt-6-astra`), verified against the local agent
+roster and available-model catalog. Luna review #1 completed with two HIGH
+and two MEDIUM findings; a bounded implementation agent fixed them and
+an additional interpreter slice-ownership regression with red/green tests.
+Luna confirmed approval, and the lead inspected diffs and reran the full
+uncached build/vet/test/race gate (PASS). Astra reviewed
+that updated state and found one MEDIUM standalone-validation issue and
+one LOW test-coverage issue (no BLOCKER/HIGH). A bounded agent fixed
+the validation wrapper and strengthened Phase 05 invariant/extension/
+serialization/concurrency tests. The lead inspected diffs and reran the
+full uncached gate (PASS), then obtained final Luna approval followed by
+final Astra approval. No findings remain outstanding. A documentation
+agent reconciled evidence/architecture/decisions/historical handoff, and
+the lead verified the final full uncached test/race/build/vet gate and
+real MP4 milestone (PASS). Final staged diff/whitespace and tracked-file
+hygiene checks pass (no matching credential/home-path patterns or
+unexpected generated artifacts). Phase 05 completion is recorded by the
+single `phase(05): implement director / video planning` commit containing
+this update. Phase 06 remains NOT STARTED. No automatic push.
 
 ---
 

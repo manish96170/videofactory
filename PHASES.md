@@ -1387,27 +1387,27 @@ Create the event backbone for observable execution.
 
 ## TODO
 
-- [ ] Event type
-- [ ] Event metadata
-- [ ] Event IDs
-- [ ] timestamps
-- [ ] project/shot correlation IDs
-- [ ] event payloads
-- [ ] event publisher
-- [ ] event subscriber
-- [ ] cancellation
-- [ ] backpressure behavior
-- [ ] error behavior
-- [ ] test concurrent subscribers
-- [ ] test event ordering guarantees
-- [ ] document ordering semantics
-- [ ] Agent review #1
-- [ ] Fix
-- [ ] Agent review #2
-- [ ] Fix
-- [ ] Evidence
-- [ ] Docs
-- [ ] Commit
+- [x] Event type
+- [x] Event metadata
+- [x] Event IDs
+- [x] timestamps
+- [x] project/shot correlation IDs
+- [x] event payloads
+- [x] event publisher
+- [x] event subscriber
+- [x] cancellation
+- [x] backpressure behavior
+- [x] error behavior
+- [x] test concurrent subscribers
+- [x] test event ordering guarantees
+- [x] document ordering semantics
+- [x] Agent review #1 (astra — see `docs/reviews/phase-02-review-astra.md`)
+- [x] Fix
+- [x] Agent review #2 (gpt-oss-120b — see `docs/reviews/phase-02-review-gpt-oss-120b.md`)
+- [x] Fix
+- [x] Evidence (`docs/phases/phase-02.md`, `docs/reviews/`)
+- [x] Docs
+- [x] Commit
 
 ## Required result
 
@@ -2881,7 +2881,7 @@ The main session must maintain this section as the authoritative high-level prog
 ```text
 [x] PHASE 00 — Foundation / Contracts
 [x] PHASE 01 — Project State / Timeline
-[ ] PHASE 02 — Event System
+[x] PHASE 02 — Event System
 [ ] PHASE 03 — Deterministic Renderer
 [ ] PHASE 04 — Flows / Framing / Primitives
 [ ] PHASE 05 — Director / Video Planning

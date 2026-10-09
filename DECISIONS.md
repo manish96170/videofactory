@@ -359,3 +359,112 @@ documentation-accuracy concerns are addressed without expanding scope
 into registry validation (Phase 04) or non-recursive graph traversal
 (left as a documented, accepted limitation for Phase 01's trusted-input
 scope).
+
+---
+
+## ADR-013: `event.Bus` ordering/backpressure/cancellation design
+
+**Date:** 2026-10-09
+**Status:** Accepted
+
+**Context:** Phase 00/01 defined `event.Type`, `event.Event`, and the
+`Publisher`/`Subscriber` interfaces, but deferred the actual pub/sub
+implementation to Phase 02, which explicitly requires defined
+cancellation, backpressure, and ordering semantics (not just "an event
+bus").
+
+**Decision:**
+- **Ordering:** a single mutex serializes `Seq` assignment and dispatch
+  in `Publish`. `Seq` (added to `event.Event`), not `OccurredAt`, is the
+  authoritative total order, since wall-clock timestamps from
+  concurrent goroutines aren't guaranteed strictly increasing at
+  whatever resolution the platform clock offers.
+- **Backpressure:** per-subscriber dispatch is non-blocking
+  (`select`/`default`); a full subscriber channel causes drop-newest
+  for that subscriber only, counted in a bus-wide `TotalDropped()`.
+  Rejected alternative: blocking `Publish` until every subscriber has
+  room, which would let one slow consumer (e.g. a laggy TUI) stall
+  generation/validation elsewhere in the system — directly contradicts
+  PHASES.md section 11.
+- **Cancellation:** each `Subscribe` call spawns one goroutine that
+  waits on *either* its own `ctx.Done()` or a bus-wide `closedCh` (closed
+  once by `Close`), then unsubscribes. Rejected alternative: watching
+  only `ctx.Done()`, which would leak a goroutine per
+  `context.Background()` subscription forever once the bus is closed.
+- **Event metadata:** `Publish` fills in `ID`/`OccurredAt` when the
+  caller leaves them zero, rather than requiring every caller to
+  hand-stamp both on every event, while still respecting explicit
+  caller-supplied values (needed for deterministic tests).
+- Scope boundary: `Bus` is in-process only, with no persistence,
+  replay, or cross-process transport — those are future-phase concerns
+  (e.g. a Lambda/control-plane event transport) layered behind the same
+  `Publisher`/`Subscriber` interfaces if ever needed, not something
+  Phase 02 should pre-build.
+
+**Consequence:** `Bus` is small, lock-protected, leak-free, and has
+concrete, tested guarantees (`event/bus_test.go`) rather than vague
+"events happen" semantics — satisfying PHASES.md Phase 02's explicit
+"test event ordering guarantees" / "document ordering semantics" /
+"test concurrent subscribers" TODO items with real tests, not just
+comments.
+
+---
+
+## ADR-014: Phase 02 review round — cancellation re-check, payload contract, and test-suite correctness fixes
+
+**Date:** 2026-10-09
+**Status:** Accepted
+**Prompted by:** Phase 02 review #1 (astra). Review #2 (gpt-oss-120b)
+found no additional issues; astra's findings were the substantive ones
+and are recorded here.
+
+**Decision:**
+- `Publish`/`Subscribe` now re-check `ctx.Err()` (and `Bus.closed`)
+  immediately after acquiring the internal mutex, not only at entry, so
+  a caller whose context was cancelled while waiting for the lock
+  doesn't still get an event dispatched or a subscription registered.
+- Documented the payload-ownership contract explicitly on `Event` and
+  `Bus`: `Payload` is shared by reference across subscribers, not
+  deep-copied, so callers must treat it as immutable once passed to
+  `Publish`. Not enforced by copying (that would cost real throughput
+  for a benefit most callers don't need), just specified.
+- Fixed a real bug in the test suite, not production code: several
+  tests called `t.Fatalf` from goroutines other than the one running
+  the test, which the `testing` package explicitly disallows for
+  `Fatal`/`FailNow` (unlike `Error`, which is safe from any goroutine).
+  `drain` was split into a goroutine-safe `drain` (returns `error`) and
+  a `mustDrain` convenience wrapper (calls `t.Fatalf`) used only from
+  the test's own goroutine; spawned goroutines now report errors
+  through a channel instead.
+- Strengthened `TestBusOrderingGuarantee` and
+  `TestBusConcurrentPublishersPreserveTotalOrder` to assert the *exact*
+  `Seq` sequence `1..n` (not just "no duplicates"), and added a start
+  barrier to the concurrent-publishers test to maximize lock contention
+  instead of relying on incidental goroutine scheduling.
+- Replaced the misleading part of the goroutine-leak test: observing
+  only that a subscription's channel closed after `Bus.Close()` doesn't
+  prove its *watcher goroutine* exited, since `Close` closes the
+  channel itself directly in its own loop regardless of the watcher.
+  `TestBusCloseDoesNotLeakBackgroundContextWatchers` now counts live
+  goroutines (`runtime.NumGoroutine()`) before and after `Close`.
+- Removed a self-inflicted test-robustness hazard in
+  `TestBusBackpressureDropsNewestWithoutBlocking`: it no longer defers
+  `Close()`, because if `Publish` ever regressed to blocking while
+  holding the mutex, that `defer` would make `Close()` block too,
+  turning a fast, clear test failure into a hung test binary.
+- Corrected a citation: "no uncontrolled goroutines" is in PHASES.md
+  section 4.10 (Lambda awareness), not 4.9, in both `bus.go`'s comment
+  and `ARCHITECTURE.md`.
+- **Follow-up fix (same reviewer, second pass):** the leak test's
+  initial tolerance (`before + n/2`) would still pass with up to half
+  of `n` watcher goroutines leaked, defeating its purpose. Tightened to
+  a small fixed constant (`leakTolerance = 10`), and verified the test
+  actually catches a real leak by temporarily reintroducing one (the
+  watcher goroutine watching only `ctx.Done()`, not `closedCh`): the
+  test failed with "before=2, after=202 (leaked watcher goroutines)" as
+  expected, then passed again once the real code was restored.
+
+**Consequence:** The Bus's correctness guarantees are now backed by
+tests that would actually fail if those guarantees regressed, and the
+test suite itself follows the `testing` package's own concurrency
+rules.

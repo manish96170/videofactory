@@ -8,7 +8,7 @@ the authoritative source; this file mirrors them and must stay in sync.
 |-------|----------------------------------------------|-------------|
 | 00    | Foundation / Contracts                       | DONE        |
 | 01    | Project State / Timeline                     | DONE        |
-| 02    | Event System                                 | NOT STARTED |
+| 02    | Event System                                 | DONE        |
 | 03    | Deterministic Renderer                       | NOT STARTED |
 | 04    | Flows / Framing / Primitives                 | NOT STARTED |
 | 05    | Director / Video Planning                    | NOT STARTED |

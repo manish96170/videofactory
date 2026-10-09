@@ -3,9 +3,10 @@
 // of truth; events exist for observability (TUI, logs, future control
 // plane), not as a sourcing mechanism.
 //
-// This package only defines the event vocabulary and the Publisher/
-// Subscriber contracts. The pub/sub implementation (cancellation,
-// backpressure, ordering guarantees) is built in Phase 02.
+// This package defines the event vocabulary, the Publisher/Subscriber
+// contracts, and (as of Phase 02) a concrete in-process Bus implementing
+// both with defined cancellation, backpressure, and ordering semantics.
+// See Bus's doc comment for the exact guarantees.
 package event
 
 import (
@@ -46,12 +47,22 @@ const (
 )
 
 // Event is a single observable occurrence in the system.
+//
+// Seq is assigned by Bus.Publish: a strictly increasing, bus-wide
+// sequence number that establishes a total delivery order independent
+// of wall-clock resolution (see Bus's doc comment). It is zero for an
+// Event that hasn't been published through a Bus yet.
+//
+// Payload is shared (not deep-copied) with every subscriber that
+// receives the event; see Bus's "Payload ownership" doc for the
+// resulting immutability contract.
 type Event struct {
 	ID         domain.ID      `json:"id"`
 	Type       Type           `json:"type"`
 	ProjectID  domain.ID      `json:"projectId,omitempty"`
 	ShotID     domain.ID      `json:"shotId,omitempty"`
 	OccurredAt time.Time      `json:"occurredAt"`
+	Seq        uint64         `json:"seq,omitempty"`
 	Payload    map[string]any `json:"payload,omitempty"`
 }
 

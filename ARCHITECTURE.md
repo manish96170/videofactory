@@ -236,3 +236,77 @@ go vet ./...
 go test ./...
 go test -race ./...
 ```
+
+Committed as `9f60d63` ("phase(01): implement project state and
+timeline"). Evidence: `docs/phases/phase-01.md`,
+`docs/reviews/phase-01-review-sol.md`,
+`docs/reviews/phase-01-review-luna6.md`.
+
+## Phase 02 — Event System
+
+### Package layout
+
+Phase 02 adds to the existing `event` package rather than a new one:
+
+```text
+event/
+├── event.go   Type vocabulary, Event (now with Seq), Publisher/Subscriber
+└── bus.go     Bus: the concrete in-process Publisher+Subscriber
+```
+
+### `event.Bus`: the concrete pub/sub implementation
+
+`Bus` is a single mutex-guarded in-process event bus. It is intentionally
+simple — "a pragmatic event-driven architecture," not "a complicated
+event-sourcing framework" (PHASES.md section 10) — and makes no attempt
+to be a durable log: core project/timeline state remains the source of
+truth, `Bus` exists purely for observability.
+
+- **Ordering:** `Publish` assigns a bus-wide, strictly increasing `Seq`
+  to every event under its mutex before dispatch, and re-checks
+  `ctx.Err()`/closed-state after acquiring that mutex (not just at entry)
+  so a caller cancelled while waiting for the lock can't still get an
+  event dispatched. A subscriber's delivery order for the types it
+  asked for always matches `Seq` order. `Seq`, not wall-clock
+  `OccurredAt`, is the authoritative order, because clock resolution/
+  monotonicity across goroutines isn't guaranteed. Tested by
+  `TestBusOrderingGuarantee` (single publisher, asserts the exact
+  sequence `1..n`, not just uniqueness) and
+  `TestBusConcurrentPublishersPreserveTotalOrder` (many concurrent
+  publishers released together via a start barrier, asserting the exact
+  `1..total` sequence with no duplicates, gaps, or reordering).
+- **Payload ownership:** `Event.Payload` is handed to every matching
+  subscriber by reference, not deep-copied per subscriber. Callers must
+  treat a published `Payload` as immutable afterward; this is a
+  documented contract (`Event`'s and `Bus`'s doc comments), not enforced
+  by copying, to keep dispatch cheap.
+- **Backpressure:** dispatch to each subscriber channel is non-blocking
+  (`select`/`default`). A full channel causes that event to be dropped
+  for that subscriber only (drop-newest) and increments
+  `Bus.TotalDropped()`; `Publish` itself never blocks on a slow
+  consumer. This matches PHASES.md section 11's requirement that "the
+  TUI must remain responsive while workers run" — a slow TUI/log
+  subscriber can't stall generation.
+- **Cancellation:** a subscription's channel closes when its own `ctx`
+  is done, *or* when `Bus.Close()` runs — whichever first. A dedicated
+  `closedCh`, closed exactly once by `Close`, wakes every subscription's
+  watcher goroutine even if that subscription's own `ctx` (e.g.
+  `context.Background()`) never cancels on its own, preventing a
+  goroutine leak (PHASES.md section 4.10, "no uncontrolled goroutines").
+  Tested by `TestBusCloseDoesNotLeakBackgroundContextWatchers`, which
+  counts live goroutines before/after rather than only checking that a
+  channel closed (a channel can close via `Close`'s own direct loop
+  even if its watcher goroutine leaked).
+- **Event metadata:** `Publish` auto-stamps `evt.ID` (via `idgen.New()`)
+  and `evt.OccurredAt` (`time.Now()`) when the caller leaves them zero,
+  so callers aren't required to hand-stamp every event — but a caller
+  that sets them explicitly (e.g. for deterministic tests) is respected.
+
+### Build / test gate (Phase 02)
+
+```text
+go build ./...
+go vet ./...
+go test ./...
+go test -race ./...
+```

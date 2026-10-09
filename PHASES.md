@@ -1474,26 +1474,26 @@ Make video composition reusable instead of hard-coded.
 
 ## TODO
 
-- [ ] Flow registry
-- [ ] Framing registry
-- [ ] primitive registry
-- [ ] capability declarations
-- [ ] developer-explainer flow
-- [ ] code-tutorial flow
-- [ ] fullscreen framing
-- [ ] split-screen framing
-- [ ] picture-in-picture framing
-- [ ] developer-circle framing
-- [ ] screen-focused framing
-- [ ] composition tests
-- [ ] ensure framing is not embedded into business logic
-- [ ] Agent review #1
-- [ ] Fix
-- [ ] Agent review #2
-- [ ] Fix
-- [ ] Evidence
-- [ ] Docs
-- [ ] Commit
+- [x] Flow registry
+- [x] Framing registry
+- [x] primitive registry
+- [x] capability declarations
+- [x] developer-explainer flow
+- [x] code-tutorial flow
+- [x] fullscreen framing
+- [x] split-screen framing
+- [x] picture-in-picture framing
+- [x] developer-circle framing
+- [x] screen-focused framing
+- [x] composition tests
+- [x] ensure framing is not embedded into business logic
+- [x] Agent review #1 (terra — see `docs/reviews/phase-04-review-terra.md`)
+- [x] Fix
+- [x] Agent review #2 (sol6 — see `docs/reviews/phase-04-review-sol6.md`)
+- [x] Fix
+- [x] Evidence (`docs/phases/phase-04.md`, `docs/reviews/`)
+- [x] Docs
+- [x] Commit
 
 ---
 
@@ -2883,7 +2883,7 @@ The main session must maintain this section as the authoritative high-level prog
 [x] PHASE 01 — Project State / Timeline
 [x] PHASE 02 — Event System
 [x] PHASE 03 — Deterministic Renderer
-[ ] PHASE 04 — Flows / Framing / Primitives
+[x] PHASE 04 — Flows / Framing / Primitives
 [ ] PHASE 05 — Director / Video Planning
 [ ] PHASE 06 — Decision Engine
 [ ] PHASE 07 — Provider System / Router

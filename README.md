@@ -13,8 +13,8 @@ Prompt → Director → VideoPlan → Shot Planner → Shot Intelligence
 
 ## Status
 
-Phase 03 (Deterministic Renderer). See `ROADMAP.md` for phase status and
-`ARCHITECTURE.md` for the as-built architecture.
+Phase 04 (Flows / Framing / Primitives). See `ROADMAP.md` for phase status
+and `ARCHITECTURE.md` for the as-built architecture.
 
 ## Requirements
 

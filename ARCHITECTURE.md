@@ -463,3 +463,126 @@ go vet ./...
 go test ./...
 go test -race ./...
 ```
+
+Committed as `5bb3c68` ("phase(03): implement deterministic
+renderer"). Evidence: `docs/phases/phase-03.md`,
+`docs/reviews/phase-03-review-luna.md`,
+`docs/reviews/phase-03-review-gpt-oss-20b.md`.
+
+## Phase 04 — Flows / Framing / Primitives
+
+### Package layout
+
+```text
+registry/
+├── flow.go             FlowRegistry (built-in: developer-explainer, code-tutorial)
+├── framing.go          FramingRegistry (built-in: 5 named framings + their Slots)
+├── primitive.go        PrimitiveRegistry (capability declarations for every PrimitiveType)
+└── compose.go          AssignSlots — the framing/business-logic decoupling proof
+```
+
+Also: `domain.Flow` gained `DefaultFramingID`/`RecommendedCategories`;
+`domain.Framing` gained `Slots []FramingSlot`; new
+`domain.PrimitiveCapabilities` (same capability-tag pattern as
+`ProviderCapabilities`/`ModelCapabilities`). All additive, following
+the same pattern Phases 01/03 used to extend `domain`.
+
+### Registries: small, mutex-protected, seeded, open to extension
+
+`FlowRegistry`/`FramingRegistry`/`PrimitiveRegistry` are each a
+mutex-protected map (safe for concurrent use, tested under `-race`)
+constructed via `NewXRegistry()`, pre-seeded with built-in entries, and
+open to runtime `Register()` of more. None are a package-level global
+singleton — callers hold and pass around their own instance, matching
+this module's existing style (`project.FileStore`, `event.Bus`, ...).
+
+- **Flows:** `developer-explainer` (→ default framing
+  `developer-circle`) and `code-tutorial` (→ default framing
+  `screen-focused`), each with a `RecommendedCategories` hint for a
+  future Director (Phase 05) — advisory, not enforced.
+- **Framings:** `fullscreen`, `split-screen`, `picture-in-picture`,
+  `developer-circle`, `screen-focused` — each a named set of
+  `domain.FramingSlot{Name, Bounds}` using the same normalized `[0,1]`
+  convention as `VisualElement` (ADR-007). `developer-circle` is
+  "main" (fullscreen) + "overlay" (small corner box) like
+  `picture-in-picture`; the "circular" presentation PHASES.md section 7
+  describes is a rendering detail for whatever draws the overlay slot's
+  content, not something the registry enforces — consistent with
+  "developer-circle must NOT become a hard-coded global architecture...
+  it is simply one reusable framing."
+- **Primitives:** every `domain.PrimitiveType` constant gets a
+  `PrimitiveCapabilities` entry (deterministic-vs-AI-capable per
+  PHASES.md section 6, `SupportsBounds`, `RequiredProperties`, `Tags`).
+  This is forward-looking metadata independent of what `render`
+  (Phase 03) actually implements today; `RequiredProperties` lists
+  only properties with *no* renderer-supplied default (so `render`
+  errors if they're absent) — `Background`'s `color` and
+  `Transition`'s `style` both default in `render/filtergraph.go`, so
+  neither is listed as required, which
+  `TestPrimitiveRegistryMatchesRenderPackageExpectations` pins
+  explicitly (an earlier version of this got that backwards — see
+  DECISIONS.md ADR-017's amendment).
+
+### Registry entries are defensively copied in and out
+
+`Register`/`Get`/`List` all copy slice-typed fields
+(`Flow.RecommendedCategories`, `Framing.Slots`,
+`PrimitiveCapabilities.RequiredProperties`/`Tags`) rather than storing
+or returning values that alias a caller's backing array. Without this,
+the mutex only protects the map itself — a caller mutating a value
+returned by `Get` (or mutating the value they passed to `Register`,
+after the call) could silently corrupt the registry's internal state,
+racily, despite the lock. Confirmed by review and verified by
+deliberately reverting the fix and watching
+`TestFlowRegistryIsolatesSliceFieldsFromCallerMutation` fail, then
+restoring it. See DECISIONS.md ADR-017's amendment.
+
+### `AssignSlots`: proof that framing isn't embedded in business logic
+
+PHASES.md Phase 04 explicitly requires "ensure framing is not embedded
+into business logic." `registry.AssignSlots(framing, content)` is the
+one function anything composing content onto a Framing should call: it
+reads only `framing.Slots`, contains no reference to any specific
+`FramingID`, and returns each matched primitive with
+`Properties["bounds"]` set to its slot's bounds (the same key
+`render`'s Image/Text primitives already read).
+
+`TestAssignSlotsWorksForARuntimeRegisteredFramingWithNoCodeChanges`
+registers a brand-new "triple-split" framing (not one of the five
+built-ins) at runtime and runs it through the unmodified `AssignSlots`
+— the concrete demonstration, not just an assertion, that adding a
+framing never requires touching this function. Separately,
+`render` (Phase 03) was grepped for any Framing-related
+conditional logic: none exists — Phase 03 operates purely at the
+Shot/Primitive level and never branches on a `FramingID`.
+
+The composition tests assign bounds-aware `Image` primitives (not
+`Background`, which `render` ignores bounds for) and assert every
+slot's *exact* bounds, index-aligned against `framing.Slots` — not
+just that a `"bounds"` key is present — so a bug that mixed up which
+slot's bounds went to which primitive would be caught.
+
+### Known limitations (Phase 04)
+
+- `developer-circle`'s overlay slot is a rectangular `Bounds`, like
+  `picture-in-picture`'s; there is no circular-mask/clipping data or
+  rendering support yet. The "circular" presentation PHASES.md section
+  7 describes is left to a future renderer capability — this phase
+  only guarantees the slot's *position*, not its shape.
+- `AssignSlots` does not validate a `Framing` passed to it directly
+  (only `FramingRegistry.Register` validates slot well-formedness);
+  callers that bypass the registry and construct a `domain.Framing` by
+  hand are responsible for its validity.
+- The registries' `Register` rejects re-registering an existing ID
+  outright; there is no "override a built-in" mechanism — a caller
+  that wants different `fullscreen` behavior must register it under a
+  new ID.
+
+### Build / test gate (Phase 04)
+
+```text
+go build ./...
+go vet ./...
+go test ./...
+go test -race ./...
+```

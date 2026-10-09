@@ -10,7 +10,7 @@ the authoritative source; this file mirrors them and must stay in sync.
 | 01    | Project State / Timeline                     | DONE        |
 | 02    | Event System                                 | DONE        |
 | 03    | Deterministic Renderer                       | DONE        |
-| 04    | Flows / Framing / Primitives                 | NOT STARTED |
+| 04    | Flows / Framing / Primitives                 | DONE        |
 | 05    | Director / Video Planning                    | NOT STARTED |
 | 06    | Decision Engine                              | NOT STARTED |
 | 07    | Provider System / Router                     | NOT STARTED |

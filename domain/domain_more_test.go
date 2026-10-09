@@ -36,16 +36,45 @@ func TestAssetJSONRoundTrip(t *testing.T) {
 }
 
 func TestFlowAndFramingJSONRoundTrip(t *testing.T) {
-	flow := Flow{ID: ID("flow-1"), Name: "developer-explainer", Description: "narrated code walkthrough"}
+	flow := Flow{
+		ID:                    ID("flow-1"),
+		Name:                  "developer-explainer",
+		Description:           "narrated code walkthrough",
+		DefaultFramingID:      ID("framing-developer-circle"),
+		RecommendedCategories: []ShotCategory{ShotCategoryAvatar, ShotCategoryCode},
+	}
 	decodedFlow := jsonRoundTrip(t, flow)
-	if decodedFlow != flow {
+	if decodedFlow.ID != flow.ID || decodedFlow.Name != flow.Name || decodedFlow.Description != flow.Description {
 		t.Fatalf("flow round trip mismatch: got %+v, want %+v", decodedFlow, flow)
 	}
+	if decodedFlow.DefaultFramingID != flow.DefaultFramingID {
+		t.Fatalf("flow DefaultFramingID mismatch: got %q, want %q", decodedFlow.DefaultFramingID, flow.DefaultFramingID)
+	}
+	if len(decodedFlow.RecommendedCategories) != 2 || decodedFlow.RecommendedCategories[0] != ShotCategoryAvatar || decodedFlow.RecommendedCategories[1] != ShotCategoryCode {
+		t.Fatalf("flow RecommendedCategories mismatch: got %+v, want %+v", decodedFlow.RecommendedCategories, flow.RecommendedCategories)
+	}
 
-	framing := Framing{ID: ID("framing-1"), Name: "developer-circle", Description: "circular webcam overlay"}
+	framing := Framing{
+		ID:          ID("framing-1"),
+		Name:        "developer-circle",
+		Description: "circular webcam overlay",
+		Slots: []FramingSlot{
+			{Name: "main", Bounds: Bounds{X: 0, Y: 0, Width: 1, Height: 1}},
+			{Name: "overlay", Bounds: Bounds{X: 0.75, Y: 0.75, Width: 0.2, Height: 0.2}},
+		},
+	}
 	decodedFraming := jsonRoundTrip(t, framing)
-	if decodedFraming != framing {
+	if decodedFraming.ID != framing.ID || decodedFraming.Name != framing.Name {
 		t.Fatalf("framing round trip mismatch: got %+v, want %+v", decodedFraming, framing)
+	}
+	if len(decodedFraming.Slots) != 2 {
+		t.Fatalf("framing Slots mismatch: got %+v, want 2 slots", decodedFraming.Slots)
+	}
+	for i, want := range framing.Slots {
+		got := decodedFraming.Slots[i]
+		if got.Name != want.Name || got.Bounds != want.Bounds {
+			t.Fatalf("framing Slots[%d] mismatch: got %+v, want %+v", i, got, want)
+		}
 	}
 }
 
@@ -75,6 +104,26 @@ func TestGenerationRequestAndResultJSONRoundTrip(t *testing.T) {
 		decodedResult.AssetID != result.AssetID || decodedResult.Seed != result.Seed ||
 		decodedResult.DurationMs != result.DurationMs || decodedResult.PeakMemoryMB != result.PeakMemoryMB {
 		t.Fatalf("generation result round trip mismatch: got %+v, want %+v", decodedResult, result)
+	}
+}
+
+func TestPrimitiveCapabilitiesJSONRoundTripAndSupports(t *testing.T) {
+	caps := PrimitiveCapabilities{
+		Type:               PrimitiveTypeText,
+		Deterministic:      true,
+		SupportsBounds:     true,
+		RequiredProperties: []string{"text"},
+		Tags:               []string{"renders-text"},
+	}
+	decoded := jsonRoundTrip(t, caps)
+	if decoded.Type != caps.Type || decoded.Deterministic != caps.Deterministic || decoded.SupportsBounds != caps.SupportsBounds {
+		t.Fatalf("primitive capabilities round trip mismatch: got %+v, want %+v", decoded, caps)
+	}
+	if !decoded.Supports("renders-text") {
+		t.Fatalf("expected decoded capabilities to support \"renders-text\"")
+	}
+	if decoded.Supports("renders-video") {
+		t.Fatalf("expected decoded capabilities to not support \"renders-video\"")
 	}
 }
 

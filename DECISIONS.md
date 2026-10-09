@@ -590,3 +590,115 @@ ffmpeg filtergraph description, prefer a file-based option (`textfile`-
 style) or a controlled-location copy over escaping-in-place, and verify
 rendered *pixels*, not just absence-of-error, before trusting an
 escaping scheme.
+
+---
+
+## ADR-017: Flow/Framing/Primitive registries as mutex-protected structs with `AssignSlots` as the only composition entry point
+
+**Date:** 2026-10-09
+**Status:** Accepted
+
+**Context:** Phase 04 asks for Flow/Framing/Primitive registries with
+capability declarations, and explicitly: "ensure framing is not
+embedded into business logic." `domain.Flow`/`domain.Framing` already
+existed (Phase 00) as pure data with no registry/lookup mechanism and
+no actual layout (`Framing` had no concept of where content goes).
+
+**Decision:**
+- `domain.Framing` gained `Slots []FramingSlot` (name + normalized
+  `Bounds`, ADR-007's convention) — the framing's *layout* becomes real
+  data, not just a label. `domain.Flow` gained `DefaultFramingID` and
+  `RecommendedCategories` as advisory metadata for a future Director
+  (Phase 05), not enforced by this phase.
+- Three registries (`FlowRegistry`, `FramingRegistry`,
+  `PrimitiveRegistry`) are plain mutex-protected structs, not
+  package-level global singletons — consistent with this module's
+  existing style (`project.FileStore`, `event.Bus`) and PHASES.md
+  section 4.9's "no hidden global mutable state." Each is seeded with
+  built-in entries by its `NewXRegistry()` constructor and open to
+  `Register()` of more at runtime.
+- `registry.AssignSlots(framing, content)` is the single function that
+  applies a Framing's layout to a set of named content primitives. It
+  reads only `framing.Slots`; it contains no `switch`/`if` on any
+  specific `FramingID` anywhere. This is the literal mechanism by which
+  "framing is not embedded into business logic" is satisfied, not just
+  asserted: `TestAssignSlotsWorksForARuntimeRegisteredFramingWithNoCodeChanges`
+  registers an entirely new framing at runtime and runs it through the
+  same, unmodified function.
+- `domain.PrimitiveCapabilities` reuses the `Tags`-based capability
+  pattern from `ProviderCapabilities`/`ModelCapabilities` (Phase 00),
+  rather than inventing a different shape — classifying every
+  `PrimitiveType` as deterministic or AI-capable per PHASES.md section
+  6, independent of whether `render` (Phase 03) currently implements
+  it. A dedicated test
+  (`TestPrimitiveRegistryMatchesRenderPackageExpectations`) pins the
+  four entries `render` *does* implement to its actual behavior, so
+  the registry's metadata and the renderer's real behavior can't
+  silently drift apart.
+
+**Rejected alternative:** package-level global registry variables
+(e.g. `var DefaultFlowRegistry = ...`). Rejected for the same reason
+`event.Bus`/`project.FileStore` aren't globals either: hidden global
+mutable state makes testing and future multi-tenant/control-plane use
+(PHASES.md section 4.10) harder, for no real benefit — callers that
+want a shared instance can construct one and pass it around.
+
+**Consequence:** Adding a new Flow, Framing, or Primitive capability
+declaration is a `Register()` call; it never requires modifying
+`AssignSlots` or any renderer. `render` (Phase 03) was confirmed to
+contain zero Framing-related conditional logic (only a plain string
+value in one test fixture), so this phase didn't need to touch it.
+
+**Amendment (same date, prompted by Phase 04 review #1 (terra) and #2
+(sol6), both independently):**
+
+1. **Slice aliasing defeated the mutex.** `Register`/`Get`/`List`
+   stored and returned values that shared backing arrays with
+   caller-owned slices (`Flow.RecommendedCategories`,
+   `Framing.Slots`, `PrimitiveCapabilities.RequiredProperties`/`Tags`).
+   A caller mutating a value returned by `Get` — or mutating the value
+   they passed to `Register`, after the call returned — could
+   silently corrupt the registry's internal state, racily, since the
+   mutex only ever protected the map itself, never the aliased slice
+   contents. **Fix:** every registry now defensively copies these
+   slice fields on both `Register` (so the stored copy can't be
+   affected by later caller-side mutation) and `Get`/`List` (so the
+   caller's copy can't affect the registry). Verified by deliberately
+   reverting the fix for `FlowRegistry` and confirming
+   `TestFlowRegistryIsolatesSliceFieldsFromCallerMutation` failed with
+   `"mutating the slice passed to Register affected the stored
+   entry"`, then restoring it and confirming the test passed again.
+2. **`FramingRegistry`'s bounds validation accepted `NaN`/`Inf`.**
+   `validateSlotBounds` used only relational comparisons, which are
+   silently `false` for `NaN` operands — despite ADR-017's original
+   text claiming it matched `render`'s `validateBounds`, which does
+   check finiteness. **Fix:** added the same `math.IsNaN`/`IsInf`
+   checks `render/properties.go` uses, for all four `Bounds` fields.
+3. **`RequiredProperties` for `Background`/`Transition` contradicted
+   `render`'s actual behavior.** `render/filtergraph.go` supplies a
+   default for `Background`'s `color` and `Transition`'s `style`
+   (neither is actually required to produce valid output), but the
+   registry listed both as required, and the test that was supposed to
+   catch drift between the two only checked the registry against
+   itself. **Fix:** removed both from `RequiredProperties`; the test
+   now explicitly asserts `Background`/`Transition` have *no* required
+   properties, documenting *why* (they default) rather than just
+   asserting a literal.
+4. **The composition "proof" tests were not rigorous enough.** The
+   generic all-framings test used `Background` (which `render` ignores
+   bounds for) and only checked that a `"bounds"` key was present, not
+   that it was the *correct* slot's bounds; the custom-framing test
+   checked exact bounds for only the first of three slots. Either
+   could pass with an implementation that assigned the wrong slot's
+   bounds to a primitive. **Fix:** both tests now use bounds-aware
+   `Image` primitives and assert every slot's exact bounds,
+   index-aligned against `framing.Slots`.
+5. Minor: a doc comment referenced a nonexistent `composition_test.go`
+   (the actual file is `compose_test.go`); fixed.
+
+**Consequence of the amendment:** the registries' concurrency safety
+claim is now actually true for every exported field, not just the map
+structure; bounds validation can't admit non-finite geometry; the
+primitive-capability/renderer-behavior consistency claim is backed by
+a test that would fail if they diverged; and the composition tests
+would catch a slot-bounds mix-up that the original versions could not.

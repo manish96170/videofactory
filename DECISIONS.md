@@ -795,3 +795,112 @@ The implementer reports red-before/green-after regressions, including both
 empty-expected-ID cases; the lead independently inspected diffs and
 verified the final gate. See
 `docs/phases/phase-05.md` and the two Phase 05 review records for provenance.
+
+---
+
+## ADR-019: Phase 06 decision execution and redacted best-effort audit policy
+
+**Date:** 2026-10-09
+**Status:** Accepted (implemented, reviewed, and final lead code gate verified)
+
+**Context:** Phase 06 adds structured, pluggable classification over existing
+contracts. The owner approved the execution policy in `PHASES.md` before
+implementation. This ADR records that approval and its implementation boundary;
+implementation presence does not establish phase completion.
+
+**Decision:**
+
+- Reuse `decision.Provider`, `provider.Provider`, and
+  `domain.DecisionRequest`/`DecisionResult`; add no domain schema fields.
+  Require a request ID and nonblank kind. No real model/vendor adapters,
+  Director integration, or Phase 07 router are in scope.
+- Score means affirmative likelihood, not confidence in the provider's
+  verdict. Validate finite `[0,1]` scores and known YES/NO/UNCERTAIN verdicts;
+  deterministic core recomputes classification from configurable thresholds:
+  YES at `>= 0.85`, NO at `<= 0.30`, otherwise UNCERTAIN by default.
+  Preserve existing zero/equal-policy semantics, including YES-first ties.
+- A decision-local registry accepts adapters through the existing decision
+  and provider-capability interfaces. Require matching stable IDs and the
+  `semantic-decision` capability. A small Resolver seam allows future
+  Phase 07 integration without implementing its routing system now.
+- Require an explicit ordered chain of distinct providers, with a fixed
+  hard limit of 8. Per-attempt timeout defaults to 5s; attempts per provider
+  include the initial call, default to 2, and have a fixed hard cap of 3.
+  Retry delay is fixed rather than exponential, defaults to 100ms, and is
+  cancellation-aware. Retry only child timeouts and explicitly classified
+  transient errors, not malformed results or valid uncertainty.
+- Execute synchronously with cooperative contexts; never detach goroutines
+  to hide a noncooperative adapter. Caller cancellation/deadline wins over
+  results, uncertainty, and exhaustion. Timeouts cannot forcibly stop an
+  adapter that ignores its context.
+- Uncertainty escalation defaults to enabled: a valid UNCERTAIN advances
+  to the next provider without retrying that uncertain result. Preserve the
+  last valid UNCERTAIN if later providers fail or abstain; when all attempts
+  fail without a valid result, return an exhausted error, not fabricated
+  uncertainty.
+- Snapshot JSON-compatible input under ADR-008's ordinary JSON number
+  semantics and give every attempt an independent copy. Callers own input
+  and must not mutate it during snapshotting; adapters must not retain or
+  asynchronously mutate attempt input after return. Concurrent callers need
+  concurrency-safe injected adapters, resolvers, and publishers. Registry
+  locks must not cover adapter calls.
+- Audit publication is optional, best-effort observability through an
+  injected publisher, with a default cooperative timeout of 200ms. Count
+  failed publications without replacing classification outcomes. Publish
+  immutable scalar-only records and engine-owned outcome codes; omit input,
+  raw kind, reason, and error text. Correlation/provider handles must be
+  nonsecret. Cancellation terminal publication may use separately bounded
+  cooperative cleanup, never detached work.
+- The bus/publisher is caller-owned. Existing event delivery is lossy and
+  nondurable; add no persistence, queue, replay, or compliance-log promise.
+  Defaults are configurable; the hard limits of 8 providers and 3 attempts
+  remain fixed.
+
+**Consequence:** Core policy, not a provider verdict, is the classification
+authority; bounded fallback preserves valid uncertainty without disguising
+failures. Input isolation and redacted audit ownership protect retries and
+concurrent use without adding provider-specific contracts or infrastructure.
+All code fixes are complete and lead-inspected; full uncached build/vet/test/race
+gate passes after the latest fix. Terra final APPROVE then Luna6 final APPROVE
+closed all findings sequentially. Phase 06 completion is recorded by its commit:
+final lead post-confirmation build/vet/uncached test/race gate and ten repeated
+decision runs also pass; final diff/formatting/hygiene checks pass.
+As-built APIs and evidence: `ARCHITECTURE.md` Phase 06 and `docs/phases/phase-06.md`.
+
+**Implementation note:** Resolver is `Resolve(ctx, id) (Provider, error)`;
+Registry admission is `Register(ctx, CapabilityAdapter) error`. `NewEngine`
+validates explicit Config without implicit defaulting; input is snapshotted
+and decoded independently per attempt. Error strings contain safe core codes
+while multi-cause unwrapping preserves `errors.Is/As` identity. FixtureProvider
+is a copied per-kind table; audit uses owned scalar maps and atomic failure
+counting, distinct from lossy bus delivery. Request/result signatures and
+schema fields are unchanged. Terminal cancellation policy above remains the
+required invariant; current code rechecks the parent after terminal publication
+and clears the result on cancellation. The single terminal event reflects state
+selected at publication start, with no second terminal event to revise it.
+This self-review fix and its three red/green cases are verified and reviewed;
+publication and cancellation remain non-atomic by design.
+
+### Amendment (2026-10-09) — bounded review hardening, not policy redesign
+
+- Lead self-review: final parent-context check after terminal publication returns
+  a zero result/cancellation while retaining prior causes; no second terminal.
+- Terra R1-01's claimed missing terminal on STARTED cancellation was disproven
+  before production edits by immediate/cooperative cancellation regressions and
+  explicitly WITHDRAWN. The defer did not move; coverage remains.
+- Terra R1-02: four red/green cases verify FAILED attribution to `lastProvider`,
+  set from the configured handle at ordinal start before resolution. Empty is
+  reserved for no attempt; COMPLETED still uses the valid/saved-uncertain source.
+- Luna6 L2-01: unconditional post-call ID check precedes error return. Mismatch
+  beats ErrTransient and preserves original `errors.Is/As` causes; parent/child
+  deadline precedence is unchanged. Two cases with MaxAttempts 3 went from three
+  calls RED to one rejected call/direct fallback GREEN.
+- Luna6 L2-02: cooperative late resolver returns never invoke its provider;
+  caps 1/2 verify timeout actions/ordinals/fallback. Already GREEN before the
+  production identity fix: coverage-only hardening. Additional ignored-result/
+  context-precedence tests pass. No raw secret metadata, domain fields, real
+  adapters, Director integration, router, or approved-default redesign was added.
+
+Final sequential approvals and reviewer retests are recorded in the lead-owned
+Phase 06 review evidence. The orchestrator verified final hygiene and records
+completion in one `phase(06): implement decision engine` commit; no automatic push.

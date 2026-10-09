@@ -733,3 +733,133 @@ Evidence: `docs/phases/phase-05.md`,
 `docs/reviews/phase-05-review-luna.md`,
 `docs/reviews/phase-05-review-astra.md`. Phase commit:
 `phase(05): implement director / video planning` (see repository history).
+
+## Phase 06 — Decision Engine
+
+**Phase 06 complete, recorded by its phase commit:** all fixes are lead-inspected;
+full uncached build/vet/test/race gate passes after the latest fix. Terra final
+APPROVE then Luna6 final APPROVE were sequential, with no outstanding findings.
+Final lead post-confirmation build/vet/uncached test/race gate and ten repeated
+decision runs pass; formatting, final staged diff, and hygiene checks pass.
+
+### Package layout and unchanged contracts
+
+Phase 06 extends `decision`: `engine.go` (Config/Engine), `registry.go`
+(Resolver/Registry/CapabilityAdapter), `errors.go` (safe errors/outcomes),
+`fixture.go` (offline per-kind provider), and `audit.go` (event publication).
+Tests are in `engine_test.go`, `registry_test.go`, and `audit_test.go`.
+Existing `decision.Provider` and domain request/result signatures and JSON
+fields are unchanged; comments clarify score/ownership semantics. `event`
+adds four decision event types, not a new bus or event schema.
+
+### Explicit configuration and deterministic authority
+
+`NewEngine(resolver Resolver, cfg Config) (*Engine, error)` validates without
+resolving/calling providers, copies `cfg.Providers`, and never implicitly
+defaults zero values. Start with `DefaultConfig(providers ...string)`:
+
+| Setting | Recommended default / constraint |
+| --- | --- |
+| Providers | Explicit ordered 1–8 distinct nonblank handles; hard cap 8 |
+| Policy | `DefaultPolicy()`: YES >= 0.85, NO <= 0.30, otherwise UNCERTAIN |
+| AttemptTimeout | 5s; must be positive |
+| MaxAttempts | 2 including initial call; allowed 1–3, hard cap 3 |
+| RetryDelay | Fixed 100ms; zero allowed, negative rejected |
+| EscalateUncertain | true |
+| Publisher / AuditTimeout | Optional nil publisher / 200ms positive timeout |
+
+Defaults are configurable; hard caps are fixed. `AuditTimeout` is validated
+even with audit disabled. A zero-value Policy is valid and yields YES for all
+valid scores; equal thresholds are valid and YES wins ties. `Engine.Decide`
+requires nonblank request ID/kind and JSON-serializable input. Known verdicts
+and finite `[0,1]` affirmative scores are validated, then core Policy recomputes
+the verdict. Empty result Provider is filled; mismatched provider identities
+are rejected. Arbitrary `ReasonCode` is returned as metadata, never authority
+or audit content. No raw kind or adapter error/outcome text is logged by core.
+
+### Decision-local registry and future routing seam
+
+`Resolver.Resolve(ctx context.Context, id string) (Provider, error)` is a
+context-aware error-returning lookup, not a boolean lookup. Custom resolvers
+own capability admission. `Registry` implements it; its zero value is usable
+and `NewRegistry()` is empty. `Register(ctx, CapabilityAdapter) error` admits
+adapters implementing both existing `decision.Provider` and `provider.Provider`.
+It rejects nil/typed-nil adapters, blank/unstable IDs, mismatching
+`Capabilities.ProviderID`, missing `semantic-decision`, and duplicate IDs.
+Capability calls run outside the map lock; Resolve returns adapter references
+without invoking them. No implicit built-ins, replacement, cost/resource
+policy, or Phase 07 router exists. Caller owns adapter/resolver lifecycles,
+stable identities, and concurrency safety; engine does not serialize calls.
+
+### Bounded synchronous attempts and input ownership
+
+Each attempt freshly decodes one JSON snapshot of caller Input (ADR-008,
+numbers decode as float64), isolating nested values across retries/fallback.
+Caller must not mutate during snapshotting; adapters must not retain or
+asynchronously mutate attempt input after return. Resolver lookup and provider
+call share the child AttemptTimeout context and run synchronously, with
+identity checks before/after the call. Late success after child timeout is
+rejected; a resolver returning a provider after child expiry never invokes it.
+Post-call adapter ID is checked even when Decide returns an error; mismatch
+preserves the original causes and beats ErrTransient, while caller cancellation
+and child deadline retain precedence. Results accompanying errors are ignored.
+Cooperative timeouts cannot forcibly stop an uncooperative dependency.
+No detached goroutine hides work. Snapshotting, audits, and retry delays are
+additional work, not part of that per-attempt timeout.
+
+Only child timeouts and `ErrTransient`-marked failures retry, with a
+cancellation-aware fixed delay; malformed/provenance errors take precedence
+over transient markers. Other failures advance through the explicit chain.
+Valid UNCERTAIN escalates without retry by default; disabling escalation
+returns it immediately. Preserve the last valid UNCERTAIN when later providers
+fail/abstain. Otherwise all-failed execution returns `ErrExhausted` with at most
+24 attempt causes. The terminal cleanup rechecks parent context after
+terminal publication, clears the result, and returns a cancellation Error retaining
+any previous failure. Certain/saved-uncertain/exhausted regressions failed before
+the fix and pass afterward; code and regression fixes are reviewed and retested.
+
+`decision.Error` formats only an engine-owned Outcome code. `Outcome()` exposes
+that code; `Unwrap() []error` returns a defensive copy preserving all causes
+for `errors.Is/As`. Raw causes require caller redaction, not direct logging;
+untrusted adapter Outcome text never becomes the core audit classification.
+
+### Fixture and best-effort audit
+
+`NewFixtureProvider(id, map[string]domain.DecisionResult)` copies/validates an
+immutable per-kind scalar table. It ignores Input, supports concurrent reads,
+and returns `ErrUnsupportedKind` for unknown kinds. Capabilities return the
+matching ID, `Local: true`, and a fresh `semantic-decision` tag slice. It calls
+no model, network, or process; no Director/pipeline integration is added.
+
+Nil/typed-nil publishers disable audit. Accepted requests use `DECISION_STARTED`,
+`DECISION_ATTEMPT_COMPLETED`, and a terminal `DECISION_COMPLETED`/`DECISION_FAILED`.
+Every event has a new ID/time and an engine-owned scalar-only immutable payload:
+request/provider handles, global attempt ordinal, core outcome/action, thresholds,
+and valid score/verdict when available; project/shot handles are envelope fields.
+Omit input, raw kind, reason, and error text; all handles must be nonsecret.
+Started uses ordinal 0; attempts start at 1 including failed resolution; terminal
+records use the final ordinal. `lastProvider` is set to the configured handle
+when the ordinal starts, before resolution. FAILED uses this last attempted handle
+(empty only if no attempt); COMPLETED uses the valid result's provider, including
+saved uncertainty from an earlier provider. No raw adapter identity is added.
+Start-publication cancellation still attempts one FAILED record with ordinal 0;
+the challenged missing-terminal claim was disproven and withdrawn, not fixed by
+moving the defer. Publishers/subscribers must respect payload immutability.
+
+Publication is synchronous/cooperative, bounded by AuditTimeout; failures or
+late publication success increment atomic `AuditFailures()` without substituting
+a classification error. Failed terminal cleanup uses a separately bounded
+`context.WithoutCancel` context. The single attempted terminal event describes
+state selected when publication starts. Parent cancellation during publication
+controls the eventual method result at the final context check; no second terminal
+event revises the first. Publication and cancellation are not atomic; the
+certain/saved-uncertain/exhausted regression cases pass after the fix.
+Publish success is not delivery: `event.Bus` can drop
+subscriber records while `AuditFailures()` stays zero; drops use `TotalDropped()`.
+Caller owns publisher/Close; no queue, persistence, replay, or compliance promise.
+
+Evidence: `docs/phases/phase-06.md` and both Phase 06 review records. Terra final
+scoped normal/race/vet and Luna6 final full uncached build/vet/test/race plus
+staged diff check pass. Final lead post-confirmation gate and hygiene pass.
+The single `phase(06): implement decision engine` commit records completion;
+resolve its hash from repository history. Phase 07 is NOT STARTED.

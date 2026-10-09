@@ -21,7 +21,10 @@ type DecisionRequest struct {
 }
 
 // DecisionResult is a structured classification, not prose, matching the
-// example in PHASES.md section 8.
+// example in PHASES.md section 8. Score is finite affirmative likelihood in
+// [0,1], not confidence in the reported Decision. The decision engine validates
+// the provider verdict, then recomputes it from Score and its threshold policy.
+// ReasonCode is optional provider metadata, not authority for classification.
 type DecisionResult struct {
 	Decision   DecisionVerdict `json:"decision"`
 	Score      float64         `json:"score"`

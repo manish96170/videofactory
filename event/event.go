@@ -36,6 +36,11 @@ const (
 	TypeGenerationCompleted Type = "GENERATION_COMPLETED"
 	TypeGenerationFailed    Type = "GENERATION_FAILED"
 
+	TypeDecisionStarted          Type = "DECISION_STARTED"
+	TypeDecisionAttemptCompleted Type = "DECISION_ATTEMPT_COMPLETED"
+	TypeDecisionCompleted        Type = "DECISION_COMPLETED"
+	TypeDecisionFailed           Type = "DECISION_FAILED"
+
 	TypeValidationStarted   Type = "VALIDATION_STARTED"
 	TypeValidationCompleted Type = "VALIDATION_COMPLETED"
 	TypeValidationFailed    Type = "VALIDATION_FAILED"

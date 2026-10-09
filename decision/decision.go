@@ -1,10 +1,5 @@
-// Package decision defines the Decision Engine's provider contract and
-// the pure threshold policy described in PHASES.md section 8.
-//
-// This package does not implement provider selection, fallback,
-// escalation, or a registry: that is Phase 06 (Decision Engine) scope.
-// Phase 00 only establishes the stable contract every future decision
-// provider and caller depends on.
+// Package decision implements structured classification with a pure threshold
+// policy, bounded retries, ordered fallback, and optional best-effort audit.
 package decision
 
 import (
@@ -18,7 +13,9 @@ import (
 // Provider classifies a domain.DecisionRequest into a structured
 // domain.DecisionResult. Concrete providers (JEV, local Qwen/Gemma,
 // Claude Haiku, Gemini Flash, ...) are introduced behind this interface
-// in later phases.
+// in later phases. Calls must cooperate with context cancellation and must
+// not retain or asynchronously mutate request input after returning. Shared
+// providers must be concurrency-safe; their lifecycle remains caller-owned.
 type Provider interface {
 	ID() string
 	Decide(ctx context.Context, req domain.DecisionRequest) (domain.DecisionResult, error)
@@ -45,9 +42,8 @@ func DefaultPolicy() Policy {
 
 // Validate reports whether the policy's thresholds are well-formed:
 // finite and satisfying 0 <= NoThreshold <= YesThreshold <= 1. A
-// zero-value Policy is invalid (NoThreshold 0 <= YesThreshold 0 holds,
-// but a caller almost certainly meant to configure real thresholds), so
-// callers should always validate policies sourced from configuration.
+// zero-value Policy is valid, as are equal thresholds; YES wins a tie.
+// Validation checks well-formedness, not caller intent.
 func (p Policy) Validate() error {
 	if math.IsNaN(p.YesThreshold) || math.IsInf(p.YesThreshold, 0) {
 		return fmt.Errorf("decision: YesThreshold must be finite, got %v", p.YesThreshold)

@@ -37,9 +37,9 @@ type PromptInterpretation struct {
 // a specific vendor's API directly.
 //
 // No implementation of this interface exists in this module yet
-// (that's Phase 06's Decision Engine / Phase 14-15's AI providers to
-// provide, behind this same interface); FixtureDirector works
-// correctly with none configured at all — see decompose.go's
+// (model-backed planning is later-phase work behind this interface;
+// the Decision Engine classifies rather than implementing it).
+// FixtureDirector works correctly with none configured at all — see decompose.go's
 // deterministic heuristics.
 type PromptInterpreter interface {
 	Interpret(ctx context.Context, prompt string) (PromptInterpretation, error)

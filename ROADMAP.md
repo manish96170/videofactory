@@ -12,7 +12,7 @@ the authoritative source; this file mirrors them and must stay in sync.
 | 03    | Deterministic Renderer                       | DONE        |
 | 04    | Flows / Framing / Primitives                 | DONE        |
 | 05    | Director / Video Planning                    | DONE        |
-| 06    | Decision Engine                              | NOT STARTED |
+| 06    | Decision Engine                              | DONE        |
 | 07    | Provider System / Router                     | NOT STARTED |
 | 08    | Model Manager / Resource Planner             | NOT STARTED |
 | 09    | Validation / Shot Intelligence               | NOT STARTED |

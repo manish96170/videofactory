@@ -1550,30 +1550,67 @@ Do not tightly couple the Director to Claude, Qwen, Gemini, or any single model.
 
 Build structured, cheap, pluggable classification.
 
+## Owner-approved execution policy (2026-10-09)
+
+- Reuse `decision.Provider` and `domain.DecisionRequest`/`DecisionResult`;
+  do not add vendor/model-specific contracts or implement real AI adapters.
+- Score is affirmative likelihood, not confidence in the reported verdict.
+  Validate finite `[0,1]` scores and known verdicts; deterministic core
+  recomputes the result with configurable thresholds. Default YES >= 0.85,
+  NO <= 0.30; retain existing zero/equal-policy semantics and YES-first ties.
+- Require request ID and nonblank kind. The decision-local registry admits
+  adapters implementing the existing decision/capability interfaces, with
+  matching stable IDs and `semantic-decision` capability. A small resolver
+  seam permits later Phase 07 integration without building its full router.
+- Require an explicit ordered provider chain (maximum 8 providers), with
+  configurable cooperative per-attempt timeout (default 5s), maximum attempts
+  per provider including initial call (default 2, hard cap 3), and fixed
+  cancellation-aware retry delay (default 100ms). Retry only child timeouts
+  and explicitly classified transient errors. Parent cancellation terminates
+  the operation; no detached goroutines to hide noncooperative adapters.
+- Default uncertainty escalation is enabled: valid UNCERTAIN advances without
+  retry; return the last valid UNCERTAIN if later providers fail or abstain.
+  If all attempts fail, return an exhausted error, not manufactured uncertainty.
+- Snapshot JSON-compatible request input and provide an independent copy per
+  attempt. Callers must not mutate input during snapshotting; adapters must
+  not retain/asynchronously mutate it after return. Concurrent callers require
+  safe adapters/resolvers/publishers; registry locks never cover adapter calls.
+- Audit is optional best-effort observability through injected events, not
+  durable/compliance storage. Default cooperative publication timeout 200ms;
+  count publication failures without replacing classification results. Publish
+  immutable scalar-only records and engine-owned outcome codes; omit input,
+  raw kind/reason/error strings. Correlation/provider handles must be nonsecret.
+  Cancellation terminal publication may use separately bounded cooperative
+  cleanup. The existing event bus may drop records; no queues/persistence added.
+- Orchestrator owns integration, test gates, tracker, and one local phase commit;
+  bounded agents own implementation/docs. User-approved sequential reviewers:
+  terra (`amazon-bedrock/openai.gpt-5.6-terra`), then luna6
+  (`amazon-bedrock/us.openai.gpt-6-luna`), verified in roster/model catalog.
+
 ## TODO
 
-- [ ] DecisionProvider interface
-- [ ] DecisionRequest
-- [ ] DecisionResult
-- [ ] YES/NO/UNCERTAIN
-- [ ] confidence/score
-- [ ] reason codes
-- [ ] configurable thresholds
-- [ ] fallback/escalation policy
-- [ ] provider registry integration
-- [ ] deterministic mock provider
-- [ ] timeout handling
-- [ ] retry policy
-- [ ] malformed-result handling
-- [ ] audit logging
-- [ ] tests
-- [ ] Agent review #1
-- [ ] Fix
-- [ ] Agent review #2
-- [ ] Fix
-- [ ] Evidence
-- [ ] Docs
-- [ ] Commit
+- [x] DecisionProvider interface
+- [x] DecisionRequest
+- [x] DecisionResult
+- [x] YES/NO/UNCERTAIN
+- [x] confidence/score
+- [x] reason codes
+- [x] configurable thresholds
+- [x] fallback/escalation policy
+- [x] provider registry integration
+- [x] deterministic mock provider
+- [x] timeout handling
+- [x] retry policy
+- [x] malformed-result handling
+- [x] audit logging
+- [x] tests
+- [x] Agent review #1 (terra — see `docs/reviews/phase-06-review-terra.md`)
+- [x] Fix (Terra withdrew disproven R1-01, confirmed R1-02 fixed; full uncached gate passes)
+- [x] Agent review #2 (luna6 — see `docs/reviews/phase-06-review-luna6.md`)
+- [x] Fix (both reviewers confirmed final approval sequentially; full uncached gate passes)
+- [x] Evidence (`docs/phases/phase-06.md`, both review records)
+- [x] Docs (ADR-019, as-built architecture, and README status reconciled)
+- [x] Commit (`phase(06): implement decision engine`)
 
 ---
 
@@ -2885,7 +2922,7 @@ The main session must maintain this section as the authoritative high-level prog
 [x] PHASE 03 — Deterministic Renderer
 [x] PHASE 04 — Flows / Framing / Primitives
 [x] PHASE 05 — Director / Video Planning
-[ ] PHASE 06 — Decision Engine
+[x] PHASE 06 — Decision Engine
 [ ] PHASE 07 — Provider System / Router
 [ ] PHASE 08 — Model Manager / Resource Planner
 [ ] PHASE 09 — Validation / Shot Intelligence
@@ -2924,7 +2961,39 @@ real MP4 milestone (PASS). Final staged diff/whitespace and tracked-file
 hygiene checks pass (no matching credential/home-path patterns or
 unexpected generated artifacts). Phase 05 completion is recorded by the
 single `phase(05): implement director / video planning` commit containing
-this update. Phase 06 remains NOT STARTED. No automatic push.
+this update. No automatic push.
+
+Phase 06 completion (2026-10-09): clean baseline at `ed20587`; full uncached
+test/race/build/vet gate passes. Read-only design scout completed; the owner
+approved the execution policy above and Terra → Luna6 review rotation.
+Implementation/docs are delegated with disjoint file ownership. No Phase
+07 router, real model adapters, or pipeline integration is in scope. Phase 06
+was implemented in bounded tasks; the lead inspected
+production diffs and representative tests, and the initial full uncached
+test/race/build/vet gate passes. A lead self-review regression for cancellation
+during terminal audit publication failed before the fix and passes afterward:
+the method now rechecks parent context after terminal publication, preserving
+one attempted terminal record. Lead retest of full uncached unit/integration,
+race, build, vet, and formatting passes. Terra formal review #1 completed
+with two MEDIUM audit findings: one accepted provider-attribution fix and
+one start-time cancellation claim disproven by regressions before production
+edits and explicitly withdrawn by Terra. The bounded agent fixed confirmed
+provider attribution with red/green tests; Terra confirmed approval, and
+the lead inspected/retested the full uncached gate (PASS). Luna6 independent
+review #2 completed with one MEDIUM post-call identity/error-path finding and
+one LOW late-resolver-timeout coverage gap. Both are assigned to the bounded
+implementation agent and now resolved: post-call ID checks precede the error
+branch, with red/green provenance tests; late successful resolver timeout is
+pinned by direct coverage. Lead inspected/retested full uncached gate (PASS),
+then Terra final approval followed by Luna6 final approval. No findings remain.
+A documentation agent closed evidence/ADR-019/as-built docs; the lead inspected
+them and verified the final post-confirmation full uncached test/race/build/vet
+gate and ten repeated decision runs (PASS), with clean formatting. Final staged
+diff/whitespace and all 109 tracked-file hygiene checks pass (no matching
+credential/private-path patterns or unexpected generated artifacts).
+Completion is recorded by the single `phase(06): implement decision engine`
+commit containing this update. Phase 06 is DONE; Phase 07 remains NOT STARTED.
+No automatic push.
 
 ---
 

@@ -39,6 +39,29 @@ The intended repository is a **public repository**.
 
 Do not expose secrets, API keys, credentials, personal tokens, local absolute paths, or private infrastructure configuration.
 
+## 0.2 Continuing orchestration authority (2026-10-09)
+
+The owner authorized this main session to continue the remaining phases in
+roadmap order, rather than waiting for a new-session prompt after each commit.
+The main session remains the lead/orchestrator and delegates bounded
+implementation, documentation, and review tasks with explicit file ownership.
+Each phase still requires the full verification, sequential independent review,
+evidence, documentation, and single local commit gate before the next begins.
+This does not authorize skipped gates, automatic push/publication, unapproved
+licensing choices, paid generation, or large model downloads. The owner separately
+delegated routine phase-scoped design gaps to the lead: choose conservative,
+deterministic defaults, document them here/in ADRs, and preserve review gates.
+Conflicting product goals, scope changes, security tradeoffs, paid operations,
+large downloads, licensing, and publication still require owner approval.
+The owner explicitly authorized reviewer rotation among terra, luna6, luna,
+and astra; verify their actual model IDs and use two distinct models
+sequentially per phase, different from implementation. Planned rotation:
+Phase 07 luna6 → astra; Phase 08 terra → luna; Phase 09 astra → terra;
+Phase 10 luna → luna6; repeat/adapt this verified roster for subsequent phases.
+Keep resumable checkpoints under §15/§26
+if context needs rollover; do not silently abandon the current phase or require
+the owner to reissue routine next-phase instructions.
+
 ---
 
 # 1. Product Definition
@@ -1620,31 +1643,72 @@ Build structured, cheap, pluggable classification.
 
 Introduce provider abstraction and routing.
 
+## Lead decisions under delegated routine-policy authority (2026-10-09)
+
+- Keep `provider.Provider` unchanged. Reuse capability tags (`deterministic`
+  for that classification) and `Local`/`!Local`; add only missing cost-unit,
+  optional latency-estimate, and separate health metadata. No model names.
+- Build a zero-value-usable registry with explicit registration/refresh/health
+  updates. Discover capabilities cooperatively outside locks; publish fully
+  validated, defensively copied snapshots atomically. IDs stay stable/matching
+  before and after discovery, even on error; capability-result ID matching
+  applies on success only (results accompanying errors are ignored). Failed refresh preserves previous
+  state; routing uses one coherent snapshot and makes no adapter calls.
+- Default health is UNKNOWN; only explicit HEALTHY is eligible. No background
+  polling, health inference, TTL, circuit breaker, or automatic replacement.
+- Route by exact case-sensitive ALL-required-tags matching. Require a nonempty
+  tag request. Default local-only; any/remote mode is explicit opt-in. Filter
+  all constraints first, then eligible explicit preferences, then deterministic,
+  local non-deterministic, remote; lexical provider-ID ties make order stable.
+  Fallback is the remaining eligible IDs, not execution/retry or relaxed gates.
+- `CostUnit` is an exact currency/unit label (no conversion); nonempty unit
+  makes zero explicitly free. Unlabelled zero cost and nil latency are unknown;
+  unknown/mismatched estimates fail an applicable cap but not unconstrained
+  routing. Nonzero cost requires a nonblank unit. Estimates are finite,
+  nonnegative declaration metadata; cap comparisons are inclusive.
+- Local hardware must be declared: nil means unknown and is ineligible;
+  explicit empty requirements mean no minimum. Positive RAM/GPU requirements
+  need known sufficient caller hardware facts. Remote execution requirements
+  are not compared with local machine facts. This is eligibility, not leases,
+  reservations, dynamic resource enforcement, or Phase 08 model management.
+- Exact-ID resolution never silently substitutes another provider. Add a
+  decision-side adapter importing `provider` (not vice versa) to require
+  semantic-decision plus a real `decision.Provider` implementation. Preserve
+  Phase 06 behavior and map permanent identity/admission failures to its
+  sentinels so transient causes cannot trigger retries of invalid providers.
+- Copy caller request/configuration slices and nested metadata/pointers;
+  preserve caller-owned concurrency-safe adapter lifecycles. Errors/rejection
+  records use safe core codes and documented nonsecret provider handles.
+- No real inference/provider installation, generation execution, worker leases,
+  shot intelligence, or external calls are in scope. Reviews: luna6
+  (`amazon-bedrock/us.openai.gpt-6-luna`) then astra
+  (`amazon-bedrock/us.openai.gpt-6-astra`), verified in roster/catalog.
+
 ## TODO
 
-- [ ] Provider interface
-- [ ] ProviderCapabilities
-- [ ] ProviderRegistry
-- [ ] ProviderRouter
-- [ ] local provider classification
-- [ ] remote provider classification
-- [ ] deterministic provider classification
-- [ ] capability matching
-- [ ] cost metadata
-- [ ] latency metadata
-- [ ] hardware requirements
-- [ ] provider health state
-- [ ] eligibility checks
-- [ ] routing policy
-- [ ] fallback policy
-- [ ] tests
-- [ ] Agent review #1
-- [ ] Fix
-- [ ] Agent review #2
-- [ ] Fix
-- [ ] Evidence
-- [ ] Docs
-- [ ] Commit
+- [x] Provider interface
+- [x] ProviderCapabilities
+- [x] ProviderRegistry
+- [x] ProviderRouter
+- [x] local provider classification
+- [x] remote provider classification
+- [x] deterministic provider classification
+- [x] capability matching
+- [x] cost metadata
+- [x] latency metadata
+- [x] hardware requirements
+- [x] provider health state
+- [x] eligibility checks
+- [x] routing policy
+- [x] fallback policy
+- [x] tests
+- [x] Agent review #1 (luna6 — see `docs/reviews/phase-07-review-luna6.md`)
+- [x] Fix (independent oracle catches deliberate mutant; production restored, Luna6 confirmed)
+- [x] Agent review #2 (astra — see `docs/reviews/phase-07-review-astra.md`)
+- [x] Fix (six-case mutant caught, production restored, sequential final approvals)
+- [x] Evidence (`docs/phases/phase-07.md`, both review records)
+- [x] Docs (ADR-020, architecture/status, and continuous authority reconciled)
+- [x] Commit (`phase(07): implement provider registry and routing`)
 
 ---
 
@@ -2923,7 +2987,7 @@ The main session must maintain this section as the authoritative high-level prog
 [x] PHASE 04 — Flows / Framing / Primitives
 [x] PHASE 05 — Director / Video Planning
 [x] PHASE 06 — Decision Engine
-[ ] PHASE 07 — Provider System / Router
+[x] PHASE 07 — Provider System / Router
 [ ] PHASE 08 — Model Manager / Resource Planner
 [ ] PHASE 09 — Validation / Shot Intelligence
 [ ] PHASE 10 — Preview / Checkpoint / Cache / Visual Review
@@ -2992,7 +3056,36 @@ gate and ten repeated decision runs (PASS), with clean formatting. Final staged
 diff/whitespace and all 109 tracked-file hygiene checks pass (no matching
 credential/private-path patterns or unexpected generated artifacts).
 Completion is recorded by the single `phase(06): implement decision engine`
-commit containing this update. Phase 06 is DONE; Phase 07 remains NOT STARTED.
+commit containing this update. Phase 06 is DONE.
+No automatic push.
+
+Phase 07 completion (2026-10-09): continuing under the owner's remaining-roadmap
+authorization, from clean commit `a6325b5`. Read-only design scout is inspecting
+provider/router contracts and policy gaps; fresh full uncached baseline gate
+passes. Owner delegated conservative routine-policy decisions and named-model
+rotation across remaining phases; lead Phase 07 decisions are recorded above.
+Implementation/docs were delegated with disjoint file ownership. Implementation
+is present and production diffs are lead-inspected; initial full uncached
+unit/integration/race/build/vet gate passes. Lead self-review corrected discovery
+error classification: stable adapter errors with empty capability results must
+not become identity mismatches; actual adapter-ID drift still takes precedence.
+Six regressions failed before the correction and pass afterward; the lead
+inspected the fix/tests and reran the full uncached gate (PASS). Luna6 formal
+review #1 found no production defect and one LOW clone-oracle test weakness.
+The bounded agent fixed it; original test passed a no-copy mutant, new test
+failed it, then production was restored and independently checked by the lead.
+Luna6 confirmed closure; full lead uncached gate passes. Astra independent
+review #2 found no production defect and one LOW Unwrap-oracle weakness.
+The bounded agent strengthened cause isolation: original aliased-Unwrap mutant
+passed, strengthened assertions failed all six cases; production restored.
+Lead inspected/retested full uncached gate (PASS), then Luna6 final approval
+followed by Astra final approval. No findings remain. Documentation closeout is
+lead-inspected; final post-confirmation full uncached test/race/build/vet and
+ten provider/decision runs pass, formatting clean. Final staged diff/whitespace
+and all 120 tracked-file hygiene checks pass (no matching credential/private-path
+patterns or unexpected generated artifacts). Completion is recorded by the
+single `phase(07): implement provider registry and routing` commit containing
+this update. Phase 07 is DONE; Phase 08 follows automatically under §0.2.
 No automatic push.
 
 ---

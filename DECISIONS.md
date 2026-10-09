@@ -904,3 +904,106 @@ publication and cancellation remain non-atomic by design.
 Final sequential approvals and reviewer retests are recorded in the lead-owned
 Phase 06 review evidence. The orchestrator verified final hygiene and records
 completion in one `phase(06): implement decision engine` commit; no automatic push.
+
+---
+
+## ADR-020: Phase 07 snapshot registry and conservative metadata-only routing
+
+**Date:** 2026-10-09
+**Status:** Accepted delegated lead policy; implemented/reviewed; completion recorded in Phase 07 commit
+
+**Context and authority:** Phase 07 follows completed Phase 06 at `a6325b5`.
+Under `PHASES.md` §0.2, the owner authorized continued roadmap execution through
+Phases 07–18 and explicitly delegated conservative routine phase policy to the
+lead. These are accepted lead decisions under that delegation, not claims that
+the owner individually approved every value or implementation detail. No renewed
+phase-by-phase prompt is required; all verification/review/commit gates remain.
+Consequential cost/security/licensing/publication choices still need owner
+approval; no automatic push or gate relaxation is authorized.
+
+**Decision:**
+
+- Routing is metadata-only. Keep `provider.Provider` unchanged; add missing
+  `CostUnit` and optional `EstimatedLatencyMs` to domain capability metadata,
+  with health represented separately. Reuse `Local`/`!Local` and the existing
+  `deterministic` tag; do not introduce model/vendor classification branches.
+  This is a Phase 07 metadata addition, not a Phase 06 schema redesign.
+- Health states are UNKNOWN, HEALTHY, UNHEALTHY, and DISABLED. UNKNOWN is the
+  default; only explicit HEALTHY is eligible. No inferred health, polling,
+  TTL, automatic replacement, or circuit breaker is introduced.
+- Use a zero-value-usable, caller-owned registry with explicit registration,
+  capability refresh, and health updates. Registry-owned snapshots deep-copy
+  tags, nested metadata, and pointers on ingress/egress. Discovery cooperates
+  with context and calls adapters outside locks. Publish validated state
+  atomically; failed refresh leaves capabilities intact and never rolls back
+  concurrent health updates. Valid refreshes are last-publication-wins, not
+  start-order freshness. Adapter IDs stay stable before/after discovery even on
+  error; capability-result ID matching applies only on success, ignoring error
+  payloads. Routing reads one coherent snapshot without adapter calls.
+- Require a nonempty capability request and exact case-sensitive matching of
+  ALL required tags. Default to local-only; remote/any routing requires explicit
+  opt-in. Apply every eligibility constraint before preferences or ranking.
+  Eligible explicit preferences come first, then deterministic providers, local
+  nondeterministic providers, and remote providers, with lexical provider-ID
+  ties independent of insertion order. Unknown/ineligible preferences are ignored;
+  blank/duplicate preferences are invalid. Copy caller request/configuration slices.
+- Fallback is an ordered list of remaining eligible IDs only: no execution,
+  retry, or relaxation of health, capability, locality, cost, latency, or hardware
+  constraints. The router does not perform generation or classification.
+- Cost units match exactly; no currency exchange or unit conversion. A nonempty
+  unit labels zero as explicitly free; unlabelled zero is unknown. Nonzero cost
+  requires a nonblank unit. Cost/latency estimates are nonnegative, finite
+  declaration metadata; nil latency is unknown. Unknown or mismatched estimates
+  fail applicable caps, not unconstrained routing; cap comparisons are inclusive.
+- Local hardware requirements must be declared: nil means unknown/ineligible;
+  an explicit empty object means no minimum. Positive RAM/GPU requirements need
+  known, sufficient pointer-valued caller facts; unknown facts matter only for
+  positive requirements. Remote hardware is not compared with the caller's
+  local budget. These checks are eligibility only,
+  not dynamic enforcement, leases, reservations, or Phase 08 model management.
+- Exact-ID resolution never substitutes a fallback provider. A decision-side
+  bridge imports `provider`, not vice versa, and requires `semantic-decision`
+  plus a real `decision.Provider` type assertion; deep-copy its policy and add
+  mandatory semantic admission. Preserve the Phase 06 engine;
+  map permanent identity/admission failures to its sentinels so underlying
+  transient causes cannot turn invalid providers into retryable attempts.
+- Adapters and their lifecycles remain caller-owned and concurrency-safe; no
+  hidden globals, detached work, or adapter calls under registry locks. Errors
+  and rejection records use safe core codes; IDs/handles must be nonsecret.
+  Do not include raw secret-bearing adapter strings in public diagnostics.
+
+**Consequence and evidence boundary:** Conservative, insertion-independent
+selection fails closed where required facts are unknown, without pretending to
+reserve resources or execute fallback. Real inference, installations, external
+calls, worker leases, and shot intelligence remain out of scope. Implemented APIs
+are source-inspected in `ARCHITECTURE.md` Phase 07 and `docs/phases/phase-07.md`.
+The lead reports full uncached build/vet/unit/race PASS after the latest fix and
+clean gofmt. Luna6 (`amazon-bedrock/us.openai.gpt-6-luna`) final APPROVE then
+Astra (`amazon-bedrock/us.openai.gpt-6-astra`) final APPROVE closed all findings
+sequentially. Final post-confirmation full gate and ten provider/decision runs
+PASS; formatting, final staged diff, and hygiene checks pass. Completion is
+recorded in the phase commit; no publication or future verification is claimed.
+
+### Amendment (2026-10-09) — verified correction and test-only review hardening
+
+This is hardening under delegated routine-policy authority, not new product policy.
+- Lead self-review fixed false identity mismatch on ordinary discovery errors:
+  adapter ID is always checked before/after, even on error; capability payload/
+  ProviderID is validated only on success. Ignore zero/wrong/malformed error
+  payloads, retain actual ID-drift precedence and original safe error causes.
+  Six regressions were RED before/GREEN after; failed refresh publishes nothing.
+- Luna6 R1 LOW: replace production-clone-based expected snapshots with independent
+  literals covering registration/refresh and Get/List ownership. Original test
+  passed a shallow-clone mutant; hardened test failed on adapter mutation.
+- Astra R2 LOW: clear ALL returned Unwrap causes, then verify applicable permanent
+  sentinel, transient cause, and `errors.Is/As` original typed-pointer identity.
+  Reviewer external overlay/implementer old test passed aliasing; hardened test
+  failed the aliased-Unwrap mutant in all six cases. Production already copied.
+- Both mutation proofs restored original production; the lead verified empty
+  production diffs. Formal reviews found no production defect; both LOW test
+  findings are closed. Only the lead self-review correction changed production.
+
+Exact evidence/retest provenance and lead-owned review paths are in the phase
+evidence. Single commit: `phase(07): implement provider registry and routing`
+(resolve its hash from repository history). Final §14 checks and hygiene pass;
+the lead continues Phase 08 automatically under §0.2, without a fresh prompt/push.

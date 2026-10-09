@@ -39,7 +39,13 @@ func (f *FixtureProvider) Capabilities(ctx context.Context) (domain.ProviderCapa
 	if err := ctx.Err(); err != nil {
 		return domain.ProviderCapabilities{}, safeError(OutcomeCanceled, err)
 	}
-	return domain.ProviderCapabilities{ProviderID: f.id, Tags: []string{"semantic-decision"}, Local: true}, nil
+	// No billable service is called: USD/decision zero declares that fact, not
+	// the machine's electricity cost. An empty hardware declaration has no
+	// minimum requirement; latency remains unknown rather than invented.
+	return domain.ProviderCapabilities{
+		ProviderID: f.id, Tags: []string{"semantic-decision", "deterministic"}, Local: true,
+		CostUnit: "USD/decision", Hardware: &domain.HardwareRequirements{},
+	}, nil
 }
 
 func (f *FixtureProvider) Decide(ctx context.Context, req domain.DecisionRequest) (domain.DecisionResult, error) {

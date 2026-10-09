@@ -863,3 +863,142 @@ scoped normal/race/vet and Luna6 final full uncached build/vet/test/race plus
 staged diff check pass. Final lead post-confirmation gate and hygiene pass.
 The single `phase(06): implement decision engine` commit records completion;
 resolve its hash from repository history. Phase 07 is NOT STARTED.
+
+## Phase 07 — Provider System / Router
+
+**Phase 07 complete (2026-10-09), recorded by its phase commit.** Implementation/fixes are
+lead-inspected; full uncached test/race/build/vet after the latest fix PASS,
+gofmt clean. Luna6 final APPROVE then Astra final APPROVE sequentially;
+no outstanding findings. Final post-confirmation full gate and ten repeated
+provider/decision runs PASS; formatting, final staged diff, and hygiene checks
+pass. Earlier phase sections retain their historical snapshots.
+Policy authority: `PHASES.md` §0.2/Phase 07 and `DECISIONS.md` ADR-020.
+
+### Metadata and unchanged provider interface
+
+`provider.Provider` remains `ID() string` plus
+`Capabilities(ctx context.Context) (domain.ProviderCapabilities, error)`.
+`domain/provider.go` adds `CostUnit string` and `EstimatedLatencyMs *int64`;
+`domain/provider_health.go` defines separate `ProviderHealth` states UNKNOWN,
+HEALTHY, UNHEALTHY, DISABLED. `provider.Snapshot` serializes only Capabilities
+and Health, never an adapter. Classification reuses `Local` and `deterministic`.
+
+`CostPerUnit` must be finite/nonnegative; nonzero requires a nonblank unit.
+A labelled zero is explicitly free; unlabelled zero is unknown. Cost units match
+exactly without trimming/conversion, including when free. Latency is nonnegative
+milliseconds; nil is unknown, pointer-to-zero known. Estimates are declarations,
+not bills, measurements, or SLAs; unknown/mismatched estimates fail applicable
+inclusive caps, but not uncapped routing. This is a Phase 07 metadata extension,
+not a retrospective redesign of Phase 06 request/result schemas or engine policy.
+
+### Registry API, ownership, and publication
+
+`provider/registry.go` implements a zero-value-usable mutex-protected Registry;
+`NewRegistry() *Registry` creates an empty registry, with no implicit providers.
+
+| Method | Result / behavior |
+| --- | --- |
+| `Register(ctx, adapter Provider) error` | Discover/validate before atomic insertion; duplicate IDs rejected; initial UNKNOWN health |
+| `Refresh(ctx, id string) error` | Publish validated capabilities only; preserve current health |
+| `SetHealth(ctx, id string, state domain.ProviderHealth) error` | Explicit state update without adapter calls |
+| `Get(ctx, id string) (Provider, Snapshot, error)` | Adapter reference plus one copied snapshot; not eligibility |
+| `List(ctx) ([]Snapshot, error)` | One coherent whole-registry snapshot, lexical provider-ID order |
+
+All methods take `context.Context`. Tags, Hardware, and latency pointers are
+copied on discovery/read; adapters remain caller-owned references. Discovery
+is synchronous/cooperative outside locks. No registry polling, expiry, removal,
+replacement, hidden timeout, or global state. Failed refresh publishes nothing;
+concurrent valid refreshes are last-publication-wins at the publish lock, not
+start-order freshness. Publication preserves intervening explicit health updates.
+
+**Verified self-review correction:** always check adapter ID
+before/after capability discovery, including on error. Only a successful
+capability result must have matching ProviderID; payloads returned with errors
+are ignored. Stable adapter errors classify as `CodeDiscoveryFailed` with
+`ErrInvalidProvider`, not false identity mismatch; real adapter-ID drift retains
+`ErrIdentityMismatch` precedence. Parent cancellation retains precedence/causes.
+Six regressions were RED before/GREEN after, with failed-refresh nonpublication
+guards. This lead self-review correction was the production fix; formal review
+findings concerned test oracles only, not production defects.
+
+### Router API and deterministic admission
+
+`provider/router.go` exposes `NewRouter(registry *Registry) (*Router, error)`;
+nil registry is invalid. `RouteRequest` contains RequiredTags, PreferredIDs,
+Locality, `MaxCost *CostLimit`, `MaxLatencyMs *int64`, and `Hardware HardwareFacts`.
+`CostLimit` has Amount/Unit; HardwareFacts contains `AvailableMemoryGB *float64`
+and `HasGPU *bool`. Nil facts are unknown; zero/false pointers are known facts.
+`RouteRequest.Clone()` copies all slices/nested pointers; `Validate()` rejects
+invalid locality, empty/blank tags, blank/duplicate preferences, and invalid
+limits/facts. Caller mutation during copying is not supported.
+
+`Route(ctx, req RouteRequest) (RouteResult, error)` filters one List snapshot
+without calling any adapter method, including ID. Require ALL tags with exact
+case-sensitive, untrimmed matching; locality zero/`LocalOnly` is local-only,
+`RemoteOnly`/`AnyLocality` explicitly opt in to remote eligibility. Only HEALTHY
+passes. Apply every gate before eligible preferences (caller order), then
+deterministic providers (including opted-in remote deterministic), local
+nondeterministic, and remaining remote providers; lexical ID breaks tier ties.
+Unknown/ineligible preferences are ignored, never a substitute for eligibility.
+
+`RouteResult.EligibleIDs` contains first choice and all eligible alternatives;
+`FallbackIDs` independently copies the tail. Rejections are lexical-ID ordered,
+with owned code slices in health/tags/locality/cost/latency/hardware order.
+When none are eligible, Route returns details with `ErrNoEligibleProviders`.
+Fallback never executes, retries, or relaxes constraints.
+
+Local Hardware nil is unknown/ineligible; explicit empty HardwareRequirements
+means no minimum. Positive MinMemoryGB requires known sufficient memory;
+RequiresGPU requires known true HasGPU. Unknown caller facts matter only for
+positive requirements. Remote requirements are not compared to local facts.
+These checks do not detect resources, reserve memory, or implement Phase 08 leases.
+
+`Resolve(ctx, id string, req RouteRequest) (Provider, error)` admits exactly id
+from a fresh Get snapshot, then checks adapter ID outside locks; no fallback
+substitution or capability discovery. This is point-in-time admission, not a
+lease: health/capabilities can change after capture and before execution.
+
+### Decision-side bridge and fixture
+
+`decision/provider_resolver.go` imports provider (not vice versa).
+`NewProviderResolver(router *provider.Router, policy provider.RouteRequest)`
+returns `(*ProviderResolver, error)`, deep-copies policy, and adds mandatory
+`semantic-decision` to ALL-required-tags (even with initially empty tags).
+Its `Resolve(ctx, id) (decision.Provider, error)` performs exact router admission,
+asserts a real decision.Provider implementation, and rechecks identity/context.
+It maps permanent provider identity/not-found/admission errors to Phase 06
+sentinels while retaining causes, preventing embedded transient markers from
+retrying invalid providers. The engine and its eight-provider cap are unchanged:
+callers explicitly pass chosen EligibleIDs to `DefaultConfig(ids...)`.
+
+`decision/fixture.go` now declares local semantic-decision + deterministic,
+explicit empty HardwareRequirements, and free `USD/decision`; latency stays nil
+(unknown). No billable service, model, network, or process is invoked; electricity
+cost is not estimated. No Director/shot-intelligence/pipeline wiring is added.
+
+### Lifecycle, diagnostics, and evidence
+
+IDs must be stable, nonsecret, fast/nonblocking (ID has no context). Caller owns
+safe concurrent adapter lifecycle and stable metadata during copying; discovery
+and execution are not serialized by registry locks or detached goroutines.
+`provider/errors.go` supplies safe `Error.Code()`/core-only strings and copied
+`Unwrap() []error` causes for `errors.Is/As`; callers must redact raw causes.
+Routing rejection records expose nonsecret handles/core codes, not raw metadata.
+No generation, installation, retries, polling, resource enforcement, or leases.
+Evidence: `docs/phases/phase-07.md`; lead-owned formal records:
+`docs/reviews/phase-07-review-luna6.md`, `docs/reviews/phase-07-review-astra.md`.
+Luna6 (`amazon-bedrock/us.openai.gpt-6-luna`) final scoped provider unit/race/vet
+PASS and APPROVE preceded Astra (`amazon-bedrock/us.openai.gpt-6-astra`) final
+provider+decision unit/race/vet/diff-check PASS and APPROVE.
+
+Both LOW findings were closed by test-only hardening with mutation proofs:
+independent literal snapshot expectations reject a shallow-clone mutant that
+passed the original test; clearing ALL returned Unwrap causes now rejects an
+aliased-cause mutant in all six cases while preserving permanent sentinels and
+original typed causes. Original production copying was restored in both proofs;
+the lead verified empty production diffs. No new product policy was introduced.
+Final post-confirmation gate and 120-tracked-file hygiene scan pass. Single
+commit: `phase(07): implement provider registry and routing` (resolve its hash
+from repository history).
+The lead continues automatically to Phase 08 after §14 and that single local
+commit under continuing owner authority; no fresh prompt or automatic push.

@@ -13,7 +13,7 @@ the authoritative source; this file mirrors them and must stay in sync.
 | 04    | Flows / Framing / Primitives                 | DONE        |
 | 05    | Director / Video Planning                    | DONE        |
 | 06    | Decision Engine                              | DONE        |
-| 07    | Provider System / Router                     | NOT STARTED |
+| 07    | Provider System / Router                     | DONE        |
 | 08    | Model Manager / Resource Planner             | NOT STARTED |
 | 09    | Validation / Shot Intelligence               | NOT STARTED |
 | 10    | Preview / Checkpoint / Cache / Visual Review | NOT STARTED |

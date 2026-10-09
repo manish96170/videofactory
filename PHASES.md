@@ -1346,32 +1346,32 @@ Implement project persistence and the fundamental video data model.
 
 ## TODO
 
-- [ ] Project model
-- [ ] VideoPlan model
-- [ ] Shot model
-- [ ] Timeline model
-- [ ] Asset model
-- [ ] Primitive model
-- [ ] Flow model
-- [ ] Framing model
-- [ ] Project loading
-- [ ] Project saving
-- [ ] Versioning strategy
-- [ ] Stable IDs
-- [ ] Stable visual element IDs
-- [ ] Element-to-shot/timeline relationship
-- [ ] Deterministic serialization
-- [ ] Timeline validation
-- [ ] Dependency representation
-- [ ] Unit tests
-- [ ] Corrupt-state/error handling
-- [ ] Agent review #1
-- [ ] Fix findings
-- [ ] Agent review #2
-- [ ] Fix findings
-- [ ] Review evidence
-- [ ] Docs
-- [ ] Commit
+- [x] Project model
+- [x] VideoPlan model
+- [x] Shot model
+- [x] Timeline model
+- [x] Asset model
+- [x] Primitive model
+- [x] Flow model
+- [x] Framing model
+- [x] Project loading
+- [x] Project saving
+- [x] Versioning strategy
+- [x] Stable IDs
+- [x] Stable visual element IDs
+- [x] Element-to-shot/timeline relationship
+- [x] Deterministic serialization
+- [x] Timeline validation
+- [x] Dependency representation
+- [x] Unit tests
+- [x] Corrupt-state/error handling
+- [x] Agent review #1 (sol — see `docs/reviews/phase-01-review-sol.md`)
+- [x] Fix findings
+- [x] Agent review #2 (luna6 — see `docs/reviews/phase-01-review-luna6.md`)
+- [x] Fix findings
+- [x] Review evidence (`docs/phases/phase-01.md`, `docs/reviews/`)
+- [x] Docs
+- [x] Commit
 
 ## Required result
 
@@ -2880,7 +2880,7 @@ The main session must maintain this section as the authoritative high-level prog
 
 ```text
 [x] PHASE 00 — Foundation / Contracts
-[ ] PHASE 01 — Project State / Timeline
+[x] PHASE 01 — Project State / Timeline
 [ ] PHASE 02 — Event System
 [ ] PHASE 03 — Deterministic Renderer
 [ ] PHASE 04 — Flows / Framing / Primitives

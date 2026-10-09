@@ -2,11 +2,21 @@ package domain
 
 import "time"
 
-// Project is the root persisted entity for a single Video Factory project.
+// Project is the root persisted entity for a single Video Factory
+// project. It owns everything that must be saved and loaded together as
+// one consistency boundary: the plan, the timeline, and the project's
+// assets (PHASES.md Phase 01, "Project State / Timeline" — "A project
+// can be created, loaded, modified, saved, and validated").
+//
+// Timeline and Assets are optional (nil/empty) because a project may
+// exist before a plan has been rendered onto a timeline, or before any
+// assets have been generated.
 type Project struct {
 	ID        ID         `json:"id"`
 	Name      string     `json:"name"`
 	Plan      *VideoPlan `json:"plan,omitempty"`
+	Timeline  *Timeline  `json:"timeline,omitempty"`
+	Assets    []Asset    `json:"assets,omitempty"`
 	CreatedAt time.Time  `json:"createdAt"`
 	UpdatedAt time.Time  `json:"updatedAt"`
 }

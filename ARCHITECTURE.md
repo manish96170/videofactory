@@ -84,11 +84,9 @@ go test ./...
 go test -race ./...
 ```
 
-These are run before every claim of phase completion. Once Phase 00 is
-actually committed, this section will reference the commit hash and the
-evidence recorded in `docs/phases/phase-00.md` and `docs/reviews/` —
-until then, treat this document as describing in-progress work, not a
-completed, committed phase.
+Committed as `727d66c` ("phase(00): establish foundation and contracts").
+Evidence: `docs/phases/phase-00.md`, `docs/reviews/phase-00-review-terra.md`,
+`docs/reviews/phase-00-review-astra.md`.
 
 ### Serialized duration and timing conventions
 
@@ -128,3 +126,113 @@ plain `[]string` with **no** constants at all: capability tags are
 genuinely open-ended and provider/model-specific (e.g.
 `"semantic-decision"`, `"realistic-human-motion"`), so this package does
 not attempt to enumerate them.
+
+## Phase 01 — Project State / Timeline
+
+### Package layout
+
+```text
+videofactory/
+├── idgen/      stable, time-sortable ID generation (ULID-shaped)
+└── project/    persistence, validation, dependency graph, timeline
+                helpers — the behavior layer over domain's data contracts
+```
+
+### `idgen`: ID generation strategy (resolves Phase 00 ADR-005)
+
+IDs are standard ULIDs (https://github.com/ulid/spec): a 48-bit
+millisecond timestamp + 80 bits of `crypto/rand` randomness, encoded as
+26 characters of Crockford Base32 with the standard 2 leading zero
+padding bits (so the first character is always `0`-`7`). This makes IDs
+lexicographically sortable by creation time, collision-resistant, and
+interoperable with any standard ULID decoder, using only the standard
+library (PHASES.md section 4.9, "no unnecessary dependencies"). A failed
+read from the OS CSPRNG is a fatal, surfaced error (`New` panics;
+`newAt` returns an error) rather than a silent predictable fallback,
+since the latter would defeat the collision-resistance guarantee.
+`idgen` has no dependency on `domain` or any other package, so any
+future package that needs to mint an ID (events, generation requests,
+decisions, ...) should call `idgen.New()` directly; `project.NewID()` is
+only a convenience wrapper for this package's own constructors.
+
+### `project`: the behavior layer over `domain`
+
+Phase 00 deliberately kept `domain` free of behavior (ADR-003). Phase 01
+is the first package to add real behavior over those contracts. It also
+extends `domain.Project` itself (ADR-010) to own `Timeline` and `Assets`
+alongside `Plan`, so the whole project aggregate — not just its plan —
+is one persisted consistency boundary.
+
+- **Validation** (`project.Validate`, `project.ValidateTimeline`):
+  structural integrity — required fields, `Project`/`VideoPlan`/`Shot`/
+  `Timeline`/`Asset` linkage, shot-ID/primitive-ID/index/asset-ID
+  uniqueness, positive shot durations, required `FlowID`/`FramingID`
+  references, dependency referential integrity and acyclicity, and
+  `Timeline`/`VisualElement` consistency: unknown-shot references,
+  non-negative and well-formed `[Start, End)` intervals, at most one
+  `TimelineEntry` per shot (whose placed duration must equal the shot's
+  own `Duration`), unique `VisualElement` IDs, every element's shot
+  actually being placed on the timeline (not just a known shot — see
+  ADR-012), and an element's shot-relative `End` never exceeding its
+  shot's declared `Duration`. Issues are aggregated with `errors.Join`
+  rather than failing fast on the first problem.
+- **Dependency graph** (`project.DependencyGraph`,
+  `BuildDependencyGraph`, `TopologicalOrder`, `Dependents`,
+  `AffectedBy`): built from `Shot.DependsOn` (PHASES.md section 4.6,
+  "incremental rebuild"). `BuildDependencyGraph` itself rejects empty or
+  duplicate shot IDs and dangling dependency references, and dedupes
+  repeated dependency edges, so it's safe to call directly without going
+  through `Validate` first. `TopologicalOrder` detects cycles and
+  reports only the cycle itself in `CycleError.Cycle`, not any acyclic
+  path that led into it. `AffectedBy` computes the transitive closure of
+  dependents a future rebuild step would need to invalidate; Phase 01
+  only builds the graph and the query, not caching/hashing/scheduling
+  (Phase 10). (Known limitation: traversal is recursive and could
+  exhaust the goroutine stack on an adversarially deep/huge dependency
+  chain; acceptable for Phase 01's locally-authored-project scope.)
+- **Timeline/element helpers** (`project.AbsoluteStart`,
+  `AbsoluteEnd`, `ElementsForShot`, `EntryForShot`): the first concrete
+  code implementing the shot-relative/project-relative timing convention
+  documented in ADR-007, rather than leaving every caller to re-derive
+  it with raw arithmetic.
+- **Persistence** (`project.Store`, `project.FileStore`,
+  `project.Marshal`/`Unmarshal`): one JSON file per project (including
+  its `Timeline` and `Assets`), wrapped in a versioned envelope
+  (`schemaVersion` + `project`), written atomically and durably
+  (temp file, write, `fsync`, close, rename, best-effort directory
+  `fsync`) so a crash mid-write cannot corrupt an existing file. `Save`
+  and `Load` both run `Validate`, and `Load` additionally rejects a file
+  whose decoded `Project.ID` doesn't match the requested ID — this
+  package never persists or returns a structurally invalid or
+  misattributed `Project` silently (PHASES.md Phase 01, "Corrupt-state/
+  error handling"; ADR-011). `Store`'s concurrency contract is
+  documented, not just implied: concurrent `Save`s for the *same*
+  project ID are last-writer-wins (no built-in optimistic concurrency);
+  concurrent operations on *distinct* IDs are fully safe, including
+  under `-race` (see `project.TestFileStoreConcurrentSaveLoadDistinctProjects`).
+
+### Security: path traversal in `FileStore`
+
+A `domain.Project.ID` is, in principle, caller-supplied data. `FileStore`
+derives a filename directly from it, so it validates every ID against a
+conservative allow-list (`^[A-Za-z0-9_-]+$`) before touching the
+filesystem, rejecting anything containing path separators or `..`
+segments. See `DECISIONS.md` ADR-009.
+
+### Known limitations (Phase 01)
+
+- Local filesystem only: `FileStore` does not defend against a
+  maliciously writable store directory (e.g. symlink substitution) —
+  acceptable for the current single-user, local-first scope. A future,
+  untrusted/multi-tenant `Store` implementation would need to.
+- No explicit project size/complexity limits (e.g. extremely large
+  dependency chains); see the `DependencyGraph` recursion note above.
+
+### Build / test gate (Phase 01)
+
+```text
+go build ./...
+go vet ./...
+go test ./...
+go test -race ./...
+```

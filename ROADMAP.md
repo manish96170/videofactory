@@ -7,7 +7,7 @@ the authoritative source; this file mirrors them and must stay in sync.
 | Phase | Name                                        | Status      |
 |-------|----------------------------------------------|-------------|
 | 00    | Foundation / Contracts                       | DONE        |
-| 01    | Project State / Timeline                     | NOT STARTED |
+| 01    | Project State / Timeline                     | DONE        |
 | 02    | Event System                                 | NOT STARTED |
 | 03    | Deterministic Renderer                       | NOT STARTED |
 | 04    | Flows / Framing / Primitives                 | NOT STARTED |

@@ -42,6 +42,13 @@ const (
 	PrimitiveTypeEnvironment     PrimitiveType = "Environment"
 	PrimitiveTypeCinematicCamera PrimitiveType = "CinematicCamera"
 	PrimitiveTypeAnimatedImage   PrimitiveType = "AnimatedImage"
+
+	// PrimitiveTypeBackground is a solid-color backdrop filling the full
+	// shot frame. It is not in the PHASES.md section 6 list verbatim,
+	// but Phase 03's "basic background primitive" TODO item requires
+	// it; added here (not just in the render package) since
+	// PrimitiveType is this module's shared, open vocabulary.
+	PrimitiveTypeBackground PrimitiveType = "Background"
 )
 
 // Primitive is a single deterministic or AI-capable building block

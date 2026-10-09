@@ -1434,31 +1434,31 @@ manual VideoPlan
 
 ## TODO
 
-- [ ] Renderer interface
-- [ ] deterministic rendering backend
-- [ ] FFmpeg integration strategy
-- [ ] basic text primitive
-- [ ] basic image primitive
-- [ ] basic background primitive
-- [ ] basic transition
-- [ ] shot composition
-- [ ] timeline composition
-- [ ] render output
-- [ ] metadata
-- [ ] render manifest / visual element metadata
-- [ ] stable rendered element identity
-- [ ] element-to-shot/timeline mapping
-- [ ] editable-property metadata
-- [ ] FFprobe validation
-- [ ] deterministic test fixture
-- [ ] end-to-end render test
-- [ ] Agent review #1
-- [ ] Fix
-- [ ] Agent review #2
-- [ ] Fix
-- [ ] Evidence
-- [ ] Docs
-- [ ] Commit
+- [x] Renderer interface
+- [x] deterministic rendering backend
+- [x] FFmpeg integration strategy
+- [x] basic text primitive
+- [x] basic image primitive
+- [x] basic background primitive
+- [x] basic transition
+- [x] shot composition
+- [x] timeline composition
+- [x] render output
+- [x] metadata
+- [x] render manifest / visual element metadata
+- [x] stable rendered element identity
+- [x] element-to-shot/timeline mapping
+- [x] editable-property metadata
+- [x] FFprobe validation
+- [x] deterministic test fixture
+- [x] end-to-end render test
+- [x] Agent review #1 (luna — see `docs/reviews/phase-03-review-luna.md`)
+- [x] Fix
+- [x] Agent review #2 (gpt-oss-20b — see `docs/reviews/phase-03-review-gpt-oss-20b.md`)
+- [x] Fix
+- [x] Evidence (`docs/phases/phase-03.md`, `docs/reviews/`)
+- [x] Docs
+- [x] Commit
 
 ## Required result
 
@@ -2882,7 +2882,7 @@ The main session must maintain this section as the authoritative high-level prog
 [x] PHASE 00 — Foundation / Contracts
 [x] PHASE 01 — Project State / Timeline
 [x] PHASE 02 — Event System
-[ ] PHASE 03 — Deterministic Renderer
+[x] PHASE 03 — Deterministic Renderer
 [ ] PHASE 04 — Flows / Framing / Primitives
 [ ] PHASE 05 — Director / Video Planning
 [ ] PHASE 06 — Decision Engine

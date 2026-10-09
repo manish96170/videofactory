@@ -13,12 +13,19 @@ Prompt → Director → VideoPlan → Shot Planner → Shot Intelligence
 
 ## Status
 
-Phase 00 (Foundation / Contracts). See `ROADMAP.md` for phase status and
+Phase 03 (Deterministic Renderer). See `ROADMAP.md` for phase status and
 `ARCHITECTURE.md` for the as-built architecture.
 
 ## Requirements
 
 - Go 1.23+
+- [FFmpeg](https://ffmpeg.org/) and `ffprobe` on `PATH`, for the
+  `render` package. A plain `ffmpeg` build is enough for
+  Background/Image-only shots; shots using the `Text` primitive need
+  `ffmpeg` built with `drawtext` support (requires `libfreetype`). On
+  macOS, Homebrew's default `ffmpeg` formula does **not** include
+  `drawtext`; `brew install ffmpeg-full` does. Tests that need `ffmpeg`
+  skip gracefully if it (or `drawtext`) isn't available.
 
 ## Build
 

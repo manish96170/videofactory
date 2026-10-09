@@ -468,3 +468,125 @@ and are recorded here.
 tests that would actually fail if those guarantees regressed, and the
 test suite itself follows the `testing` package's own concurrency
 rules.
+
+---
+
+## ADR-015: `render` package shells out to `ffmpeg`/`ffprobe` via `os/exec`
+
+**Date:** 2026-10-09
+**Status:** Accepted
+
+**Context:** Phase 03 needs an "FFmpeg integration strategy" — a
+decision this module hadn't made yet. PHASES.md section 2.1 explicitly
+endorses native tools ("Use native executables where appropriate:
+FFmpeg, FFprobe, OpenCV") and separately describes a Go-core-manages-
+external-process pattern for Python workers that generalizes cleanly to
+any native tool.
+
+**Decision:** The `render` package builds a deterministic ffmpeg
+filter graph and command line from `domain` types in Go, then invokes
+the external `ffmpeg`/`ffprobe` binaries via `os/exec` with
+`context.Context` (so cancellation kills the process), rather than
+linking against libav via cgo bindings.
+
+**Rejected alternative:** cgo/libav bindings. Rejected because they add
+build complexity (a C toolchain and libav headers become required to
+even `go build`), hurt portability (version-matching libav across
+platforms), and aren't needed — the CLI tools expose everything Phase
+03 needs. This matches PHASES.md section 4.9's "no unnecessary
+dependencies."
+
+**Consequence:**
+- `ffmpeg`/`ffprobe` are a **system dependency**, not a Go module
+  dependency; they must be installed separately (see `README.md`).
+- Tests that need them skip gracefully (`requireFFmpeg`/
+  `requireDrawtext`/`requireFontPath` in `render/testhelpers_test.go`)
+  rather than failing on a machine without them, since this is public,
+  cross-contributor code.
+- A plain `ffmpeg` build without `libfreetype` can still render
+  Background/Image-only shots; only Text primitives need `drawtext`
+  (and therefore `libfreetype`). On this development machine, the
+  default Homebrew `ffmpeg` formula didn't include `drawtext`; the
+  `ffmpeg-full` formula does (and happens to also bundle `libass`,
+  useful for Phase 11's subtitles later).
+
+---
+
+## ADR-016: `drawtext` text/path escaping abandoned in favor of controlled temp files
+
+**Date:** 2026-10-09
+**Status:** Accepted (superseding an earlier same-day version of this
+ADR — see "History" below)
+
+**Context:** ffmpeg's filtergraph description syntax has its own
+escaping rules, and they are easy to get wrong from memory/documentation
+skimming alone. The first implementation of `escapeDrawtext` prefixed a
+backslash before `\`, `:`, and `'` uniformly — which looked reasonable
+but was wrong, and the failure mode was confusing: ffmpeg didn't reject
+the single quote; it corrupted parsing of the *next* filter option
+("expansion"), producing the misleading error `Unable to parse
+"expansion" option value "none[v1]"`.
+
+**History of this ADR (both superseded by the final decision below):**
+
+1. **First attempt:** backslash-escape `\`, `:`, and `'` uniformly.
+   Wrong — broke parsing of the following option (see above).
+2. **Second attempt (same day):** wrap the value in single quotes and
+   use `\\`/`\:`/`'\''` (the POSIX-shell-style close/escape/reopen
+   trick for the embedded quote). This *parsed without error* and was
+   initially believed correct and "empirically verified." It was not:
+   building the Phase 03 pixel-sampling tests (prompted by review
+   feedback that metadata-only checks don't prove anything visual
+   actually rendered) revealed that **any text containing an
+   apostrophe via this trick rendered as completely empty text** —
+   `ffmpeg` exited `0` with no error, but zero pixels differed from
+   the background. The same trick applied to a font *path* containing
+   special characters also broke parsing of the following
+   (`textfile=`) option entirely, differently from the text case. This
+   is a correctness bug, not just a leftover security concern: trusting
+   "no error" as proof of correctness was itself the mistake.
+
+**Decision (final):** Stop embedding caller-controlled strings into the
+filter_complex string's option values at all, for both text content and
+the font path:
+
+- Text content is written to a temp file and referenced via
+  `drawtext`'s `textfile=` option instead of `text=`. `textfile` reads
+  raw file content with no filtergraph-level escaping of the text
+  itself required, which sidesteps the whole class of bug — including
+  letting multi-line text work for free (no longer rejected).
+- `Settings.FontPath` (however the caller supplied it) is copied, by
+  content, to a new temp file in a freshly created temp directory with
+  a fixed, Go-generated filename (`font.ttf`). The *generated* path is
+  what gets embedded in `fontfile=`, never the original string.
+- Both generated paths are checked against `checkFilterGraphSafePath`
+  (rejecting `:`, `'`, `\`, `;`, `,`, `[`, `]`) before use, as a defense
+  check against a pathological `TMPDIR`, even though `os.CreateTemp`/
+  `os.MkdirTemp` paths satisfy this in practice.
+- `filterPlan` now carries `cleanup []func()` for these temp
+  files/directories; `FFmpegRenderer.RenderShot` defers running them
+  after the ffmpeg command finishes (success or failure), and
+  `buildFilterGraph` itself cleans up anything it already created if it
+  returns an error partway through.
+
+This also resolves the original security motivation (a `FontPath`
+containing filtergraph syntax characters injecting additional filter
+stages — confirmed exploitable in review): the font file is never
+referenced by its original, potentially attacker-influenced path at
+all, so there is nothing left to inject through.
+
+**Regression tests:**
+`TestRenderShotText` now asserts actual rendered pixels (not just "no
+error"), using text containing both `:` and `'` together, and would
+have caught this bug — it did, during development, before this fix
+landed. `TestFontPathInjectionIsNeutralized` and
+`TestPrepareSafeFontFileNeutralizesSpecialCharactersInOriginalPath`
+cover the path-injection angle specifically.
+
+**Consequence:** Text containing `:`, `'`, `\`, or multiple lines
+renders correctly. The lesson generalizes: for any future primitive/
+filter that would otherwise embed a caller-controlled string into an
+ffmpeg filtergraph description, prefer a file-based option (`textfile`-
+style) or a controlled-location copy over escaping-in-place, and verify
+rendered *pixels*, not just absence-of-error, before trusting an
+escaping scheme.

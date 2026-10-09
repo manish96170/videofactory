@@ -310,3 +310,156 @@ go vet ./...
 go test ./...
 go test -race ./...
 ```
+
+Committed as `c05f2fd` ("phase(02): implement event system").
+Evidence: `docs/phases/phase-02.md`, `docs/reviews/phase-02-review-astra.md`,
+`docs/reviews/phase-02-review-gpt-oss-120b.md`.
+
+## Phase 03 — Deterministic Renderer
+
+### Package layout
+
+```text
+render/
+├── render.go       Settings, Renderer interface, FFmpegRenderer.RenderShot
+├── ffmpeg.go       os/exec process execution (cancellation, stderr capture)
+├── filtergraph.go  Primitive -> ffmpeg filter_complex graph construction
+├── properties.go   typed Properties extraction, color/bounds/escaping helpers
+├── probe.go        ffprobe-based output validation
+├── manifest.go     RenderManifest/VisualElement derivation + persistence
+└── timeline.go     sequential Timeline construction + concat-demuxer composition
+```
+
+Also: `domain.PrimitiveTypeBackground` was added in `domain/shot.go`
+(Phase 03's "basic background primitive" isn't in PHASES.md section 6's
+list, but the Phase 03 TODO explicitly requires it, and `PrimitiveType`
+is an open vocabulary precisely so this kind of addition doesn't need a
+new phase).
+
+### FFmpeg integration strategy (ADR-015)
+
+Core logic (deciding *what* to render) stays in Go; the external
+`ffmpeg`/`ffprobe` binaries do the actual pixel/encoding work, invoked
+via `os/exec` with `context.Context` for cancellation — not cgo/libav
+bindings. `ffmpeg`/`ffprobe` are a system dependency, not a Go module
+dependency (see `README.md`).
+
+### Shot composition: layered primitives, one filter graph per shot
+
+`buildFilterGraph` composes a Shot's Primitives into one ffmpeg filter
+graph:
+
+- At most one `Background` primitive (solid color, default black) is
+  always the base layer, regardless of its position in the Primitives
+  list.
+- Any number of `Image`/`Text` primitives are composited bottom-to-top
+  in list order: images via `scale`+`overlay` (looped-still-image
+  inputs), text via `drawtext` directly on the running composite.
+- At most one `Transition` primitive applies a whole-shot `fade`
+  (in or out) as the final stage — a transition is its own short Shot
+  (typically `ShotCategoryTransition`) bridging two content shots on
+  the Timeline, not a cross-fade between two shots' pixels (deferred;
+  see Known limitations).
+- Any other `PrimitiveType` (CodeEditor, Terminal, DeveloperAvatar,
+  ...) is an explicit error, not a silently-skipped no-op: those need
+  AI-assisted or other future-phase rendering this package doesn't
+  attempt yet.
+
+Bounds (`Primitive.Properties["bounds"]`) reuse `domain.Bounds`'
+normalized `[0,1]`, top-left-origin convention from Phase 00 (ADR-007);
+`boundsToPixelBox` converts to pixels and rounds width/height up to the
+nearest even number (required for `yuv420p` 4:2:0 chroma subsampling).
+
+### `drawtext` text/font-path handling (ADR-016)
+
+Text content and `Settings.FontPath` are never embedded directly into
+the `filter_complex` string: text is written to a temp file and
+referenced via `textfile=`, and the font is copied (by content) to a
+temp file with a Go-generated safe name, referenced via `fontfile=`.
+An earlier escaping-based approach *parsed without error* but silently
+rendered empty text for any input containing an apostrophe — caught
+only once pixel-level assertions were added to the integration tests,
+not by "ffmpeg exited 0." See ADR-016 for the full story and why
+escaping-in-place was abandoned in favor of controlled temp files.
+`filterPlan.cleanup` holds the resulting temp-file removal functions,
+run by `RenderShot` after the ffmpeg command finishes either way.
+
+### Render manifest / stable element identity
+
+Each rendered shot gets a sidecar `<shotID>.render.json`
+(`shot-017.mp4` / `shot-017.render.json`, PHASES.md section 4.6.1),
+versioned like `project`'s persistence (`MarshalManifest`/
+`UnmarshalManifest`). Every `Primitive` becomes one `VisualElement`
+that **reuses the Primitive's own ID directly** as its element ID —
+Primitive IDs are already stable (assigned by whatever built the
+`Shot`), so this satisfies "stable rendered element identity" without
+a separate content-hashing scheme. Every element spans
+`[0, shot.Duration)`: Phase 03 doesn't yet support a primitive active
+for only part of its shot. `validateShotPrimitiveIDs` rejects an empty
+or duplicate `Primitive.ID` before rendering, so this identity
+guarantee can't be silently violated; `validateSettings` similarly
+rejects a non-positive `Width`/`Height`/`FPS` before it reaches ffmpeg
+as a confusing invocation failure.
+
+### Timeline composition
+
+`BuildSequentialTimeline` places a `VideoPlan`'s shots back-to-back in
+`Index` order (a default placement strategy, not the only possible
+one). `ComposeTimeline` concatenates their rendered clips via ffmpeg's
+concat demuxer with a stream copy (`-c copy`, no re-encoding, since
+every clip shares the same `Settings`). Every entry's interval must be
+well-formed (`End > Start`), and entries must be contiguous
+(`entry[i].End == entry[i+1].Start`, first `Start == 0`); gap-filling
+(e.g. inserting black filler for a deliberate gap) is deferred —
+`ComposeTimeline` returns a clear error for a malformed or
+non-contiguous timeline rather than attempting it silently.
+
+### FFprobe validation and pixel-level verification
+
+`Probe` parses `ffprobe`'s JSON output (duration, resolution, codec,
+frame rate); `ValidateOutput` compares it against the `Settings` and
+expected duration a render was supposed to produce (with a
+`durationTolerance` for encoder/container rounding). `RenderShot` runs
+this automatically after every render, so an `ffmpeg` invocation that
+exits `0` but produces something unexpected is still caught — though
+"unexpected" here only covers container/stream-level metadata, not
+pixel content; see the next section for why that distinction mattered
+in practice.
+
+`SamplePixel`/`RGB.CloseTo` extract and compare actual rendered pixel
+colors (via `-f rawvideo -pix_fmt rgb24` output), used by
+`render_test.go` to verify background color, image placement (inside
+vs. outside its bounds), text presence, and fade brightness change —
+not just "ffmpeg exited 0 and ffprobe likes the result." This exists
+*because* a real bug (ADR-016) parsed and probed successfully while
+rendering completely empty text; metadata-only checks would never have
+caught it.
+
+### Deterministic test fixtures
+
+The end-to-end milestone test (`TestEndToEndThreeShotMilestone`, see
+PHASES.md section 29's First Milestone: "Manual VideoPlan → 3
+deterministic shots → Deterministic renderer → MP4") generates its
+image fixture at test time via `image/png` rather than committing a
+binary PNG to the repository.
+
+### Known limitations (Phase 03)
+
+- No cross-fade between two different shots' pixels — a Transition
+  primitive is a whole-shot fade-to/from-black, not a true two-clip
+  blend. True cross-fades need overlapping clip ranges and `xfade`,
+  deferred to a later phase/refinement.
+- `ComposeTimeline` requires contiguous entries; gap-filling (black
+  filler for deliberate gaps) isn't implemented.
+- Every `VisualElement` spans its whole shot; a primitive active for
+  only part of a shot isn't supported yet.
+- No audio track (Phase 11 owns audio/timestamp integration).
+
+### Build / test gate (Phase 03)
+
+```text
+go build ./...
+go vet ./...
+go test ./...
+go test -race ./...
+```

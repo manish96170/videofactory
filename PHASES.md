@@ -1718,40 +1718,98 @@ Introduce provider abstraction and routing.
 
 Make local AI execution hardware-aware and memory-safe.
 
+## Lead decisions under delegated routine-policy authority (2026-10-10)
+
+- Preserve resource Request/Manager/Lease and domain ResourcePlan contracts;
+  add only missing heavy/accelerator flags, model execution requirements, and
+  estimate provenance. Freeze shared contracts before disjoint model/worker work.
+- Configuration is explicit, not detected or assumed. Reference profile: decimal
+  GB = 1,000,000,000 bytes; supplied 16 GB total less 3 GB system, 4 GB user,
+  1.5 GB Director gives 7.5 GB worker RAM. CPU/accelerator facts are explicit;
+  reference MaxParallel=2, MaxHeavy=1, queue limit=64. Validate reserves and caps.
+- Grant RAM/CPU/GPU/slot/heavy/exclusive allocations atomically. RAM is integer
+  bytes; conservatively quantize fractional CPU/GPU allocation units to fixed
+  micro-units to avoid cumulative floating-point release drift. Reject invalid,
+  incompatible, overflowing, or permanently over-budget requests before queueing.
+  Heavy classification includes explicit heavy, positive GPU use, or RAM >= a
+  configured threshold (reference 2 GB); callers cannot bypass it with false flags.
+- Use bounded FIFO with intentional head-of-line blocking. Remove canceled tickets;
+  roll back a grant when cancellation is observed before handoff. Granted leases
+  are caller-owned, never freed automatically while work might still run. Concrete
+  Release is bounded, concurrency-safe, and idempotent. Snapshots are copied.
+- Accelerator backend/capacity and unified/discrete memory facts are explicit;
+  Metal is not CUDA. GPU units are logical allocations, not a measured VRAM ceiling.
+  Profiles must account for unified-memory allocations in RAM; unknown positive
+  requirements are locally ineligible. No claim of kernel RAM/CPU/GPU containment.
+- Freeze revisioned execution profiles with declared load/resident/workspace bounds
+  and supported precision/size/frame/quality/offload/chunk envelopes. Legacy minimum
+  memory is a floor, not a peak. Apply a configurable reference 25% safety margin;
+  unknown/unbounded profiles cannot load locally. No invented weights-to-RAM formulas.
+- Bounded, copied history (reference 256 exact workload/profile/hardware keys)
+  stores parent-measured peaks, load/run/unload timing, source/completeness, and
+  deterministic snapshot provenance. History may raise reservations, never lower
+  them from sparse samples. A full history rejects new keys instead of silently
+  evicting learned high-water evidence; existing keys may still update. No ambient
+  state, raw prompts/paths, or auto persistence.
+- Model manager refuses busy/reserving/loading/unloading conflicts. Acquire a full
+  peak reservation before loading and retain RAM/CPU/GPU/slot/heavy resources until
+  explicit unload; use-handle release only clears use ownership. No nested worker
+  acquisition, hidden eviction, or automatic context-expiry refund of live resources.
+  Recompute admission from frozen profiles, not caller/LLM-edited ResourcePlans.
+  Loaded-instance reuse is conservatively limited to the same profile/exact
+  workload with sufficient held reservation; otherwise explicit unload is required.
+- Call loaders outside locks; check identity before/after every callback, including
+  error paths. Reference cooperative load timeout 30s, unload/cleanup 5s. Failed,
+  canceled, or late loads perform separately bounded cleanup. Release only on
+  proven stop; uncertain cleanup retains a quarantined reservation for explicit retry.
+- Worker processes use direct os/exec and versioned bounded JSON, not shell text
+  or Python embedding. Trusted runtime config owns argv/cwd/environment/executable,
+  never generation parameters. Reference stdin/stdout limits 1 MiB, stderr 8 KiB,
+  sample interval 100ms, cleanup timeout 5s; validate successful reply correlations,
+  ignore error-accompanying payloads, and emit only safe core diagnostics.
+- Own one Unix process group/Wait path and join reader/monitor tasks. Stop/reap and
+  clean remaining descendants on cancellation, breach, protocol failure, or normal
+  exit before reporting resources stopped. Native macOS/Linux family RSS sampling
+  failures fail closed; sampled breach detection is not an instantaneous hard cap.
+  Workers must not daemonize/escape the group; unsupported platforms fail explicitly.
+- Planning distinguishes permanent local ineligibility, temporary wait, and explicitly
+  gated Phase 07 remote candidates. PreferRemote is advice, never permission to spend
+  or execute. No models/downloads/cloud calls. Reviews: verified terra then luna.
+
 ## TODO
 
-- [ ] ResourceManager interface
-- [ ] ResourceRequest
-- [ ] ResourceLease
-- [ ] ResourcePlan
-- [ ] memory budget
-- [ ] CPU budget
-- [ ] GPU/Metal capability representation
-- [ ] model requirements
-- [ ] model lifecycle
-- [ ] load/unload interface
-- [ ] resource reservation
-- [ ] resource release
-- [ ] concurrency limits
-- [ ] queueing
-- [ ] cancellation
-- [ ] process monitoring
-- [ ] peak-memory tracking
-- [ ] model timing
-- [ ] adaptive historical planning
-- [ ] local-vs-remote decision
-- [ ] worker process abstraction
-- [ ] no Python embedding
-- [ ] tests for over-budget requests
-- [ ] tests for concurrent resource requests
-- [ ] race tests
-- [ ] Agent review #1
-- [ ] Fix
-- [ ] Agent review #2
-- [ ] Fix
-- [ ] Evidence
-- [ ] Docs
-- [ ] Commit
+- [x] ResourceManager interface
+- [x] ResourceRequest
+- [x] ResourceLease
+- [x] ResourcePlan
+- [x] memory budget
+- [x] CPU budget
+- [x] GPU/Metal capability representation
+- [x] model requirements
+- [x] model lifecycle
+- [x] load/unload interface
+- [x] resource reservation
+- [x] resource release
+- [x] concurrency limits
+- [x] queueing
+- [x] cancellation
+- [x] process monitoring
+- [x] peak-memory tracking
+- [x] model timing
+- [x] adaptive historical planning
+- [x] local-vs-remote decision
+- [x] worker process abstraction
+- [x] no Python embedding
+- [x] tests for over-budget requests
+- [x] tests for concurrent resource requests
+- [x] race tests
+- [x] Agent review #1 (terra — see `docs/reviews/phase-08-review-terra.md`)
+- [x] Fix (LOW stale full-gate status corrected; no code defects found)
+- [x] Agent review #2 (luna — see `docs/reviews/phase-08-review-luna.md`)
+- [x] Fix (Luna approved with no outstanding findings)
+- [x] Evidence (`docs/phases/phase-08.md`, formal Terra/Luna and supplementary Astra records)
+- [x] Docs (ADR-021, whole-phase architecture, status, and checkpoint reconciled)
+- [x] Commit (`phase(08): implement resource and model management`)
 
 ## Required invariant
 
@@ -2988,7 +3046,7 @@ The main session must maintain this section as the authoritative high-level prog
 [x] PHASE 05 — Director / Video Planning
 [x] PHASE 06 — Decision Engine
 [x] PHASE 07 — Provider System / Router
-[ ] PHASE 08 — Model Manager / Resource Planner
+[x] PHASE 08 — Model Manager / Resource Planner
 [ ] PHASE 09 — Validation / Shot Intelligence
 [ ] PHASE 10 — Preview / Checkpoint / Cache / Visual Review
 [ ] PHASE 11 — Audio / Timestamp / Temporal Intelligence
@@ -3087,6 +3145,58 @@ patterns or unexpected generated artifacts). Completion is recorded by the
 single `phase(07): implement provider registry and routing` commit containing
 this update. Phase 07 is DONE; Phase 08 follows automatically under §0.2.
 No automatic push.
+
+Phase 08 start (2026-10-10): continuing automatically under §0.2 from clean
+commit `dbc5ace`; Phase 07's final full gate validates the unchanged baseline.
+A read-only design scout is inspecting existing resource/model/worker contracts;
+fresh scoped resource/provider/decision checks pass. Routine conservative
+policy is recorded above before implementation. Planned sequential reviewers:
+terra (`amazon-bedrock/openai.gpt-5.6-terra`), then luna
+(`amazon-bedrock/openai.gpt-5.6-luna`), verified in roster/catalog. No real model
+downloads, paid generation, or infrastructure actions are authorized by this
+phase. Shared-contract/resource core is implemented and API shapes are frozen;
+lead inspection and fresh post-correction scoped unit/race/vet checks pass,
+including targeted high-water retention. History rejects new keys at capacity
+without forgetting peaks; shared API shapes remain frozen. ADR-021/draft evidence
+and `docs/handoffs/next-session-phase-08.md` checkpoint exist. Disjoint model owner
+`ses_ed959092cffegR0uDf06aQ0i0S` and worker owner
+`ses_ed958fec0ffeJ5Tsea4RGVxRBn` are implementing their packages against these
+contracts. Both formal reviews and phase completion remain pending.
+
+Worker tranche is implemented; the lead inspected runner/protocol/monitor/platform
+code and independently ran worker/resource/domain unit tests, worker race tests,
+and vet (PASS). Typed-nil monitor constructor validation is corrected with
+pointer/function red/green tests; lead inspected and independently reran worker
+unit/race/vet (PASS). A supplementary read-only Astra worker reliability audit
+completed with 3 MEDIUM protocol/monitoring findings and 1 LOW assertion weakness
+(see `docs/reviews/phase-08-worker-audit-astra.md`). Worker owner corrected all
+four with red/green regressions; lead scoped unit/race/vet rerun passes and
+Astra supplemental confirmation approved on 2026-10-11 with independent
+regressions passing. This audit does not replace formal Terra → Luna reviews.
+Original model owner was canceled; five existing production files are preserved.
+Lead inspected them and confirmed three bounded lifecycle tests pass with
+independent model unit/race/vet checks. Production remains unchanged except
+formatting; no rewrite. Two test-only owners now add missing coverage in disjoint
+files: `ses_ed85889b0ffeyKfTmFiWxaXgu4` owns `model/lifecycle_test.go`, and
+`ses_ed858898fffeCcwx9ONvCr0PkD` owns `model/ownership_test.go`. They may not
+edit production; any failures require a single lead-assigned fix owner.
+Both bounded test-only owners completed five focused tests each (PASS), with
+no production fixes needed. Lead inspected source/representative assertions
+and ran full uncached repository unit/integration tests, race tests, build,
+vet, formatting, and whitespace checks (PASS). Code is frozen; no writer remains.
+Formal Terra review #1 approved with no code defect and one LOW stale-gate
+documentation finding, now corrected. Terra independently reran full gate (PASS).
+Sequential Luna review #2 approved with no BLOCKER/HIGH/MEDIUM findings and
+independent tests/race/vet/Linux+Windows build/diff checks passing. Both formal
+reviews are complete; supplementary worker findings remain closed. Final lead
+full uncached unit/integration/race/build/vet rerun also PASS, with clean
+formatting/whitespace. Evidence/architecture/ADR-021 and checkpoint are reconciled;
+final staged diff/whitespace and 157-tracked-file hygiene scan pass (no matching
+credential/private-path patterns or unexpected generated artifacts). Completion
+is recorded by the single `phase(08): implement resource and model management`
+commit containing this update. Phase 08 is DONE; Phase 09 follows automatically
+under §0.2. No automatic push. Linux runtime coverage remains a documented
+follow-up, not a completed verification claim.
 
 ---
 

@@ -14,7 +14,7 @@ the authoritative source; this file mirrors them and must stay in sync.
 | 05    | Director / Video Planning                    | DONE        |
 | 06    | Decision Engine                              | DONE        |
 | 07    | Provider System / Router                     | DONE        |
-| 08    | Model Manager / Resource Planner             | NOT STARTED |
+| 08    | Model Manager / Resource Planner             | DONE        |
 | 09    | Validation / Shot Intelligence               | NOT STARTED |
 | 10    | Preview / Checkpoint / Cache / Visual Review | NOT STARTED |
 | 11    | Audio / Timestamp / Temporal Intelligence    | NOT STARTED |

@@ -1002,3 +1002,170 @@ commit: `phase(07): implement provider registry and routing` (resolve its hash
 from repository history).
 The lead continues automatically to Phase 08 after §14 and that single local
 commit under continuing owner authority; no fresh prompt or automatic push.
+
+## Phase 08 — Model Manager / Resource Planner (as-built draft)
+
+**Phase 08 complete (2026-10-11), recorded by its phase commit.** Started
+2026-10-10 above `dbc5ace`. Resource/domain, worker, and model source is present;
+Model APIs are source-inspected; no active code/test writers. Scoped PASS is reported evidence.
+Main uncached whole gate PASS; Terra then Luna formally APPROVED sequentially.
+Terra's LOW stale-gate text finding is closed; no outstanding formal findings.
+Final post-review lead full uncached test/race/build/vet gate PASS; formatting
+and whitespace clean. Final staged diff and hygiene checks pass.
+Authority: `PHASES.md` §0.2/Phase 08 and ADR-021; no renewed routine prompt/auto-push.
+
+### Source boundaries and resource API
+
+- `resource/{config,math,manager}.go`: explicit budget validation, exact decimal
+  arithmetic, integer-byte RAM and CPU/GPU micro-units, atomic FIFO admission.
+- `resource/{profiles,estimate,history,planner}.go`: revisioned profile validation,
+  conservative estimates, bounded copied evidence, advisory local/remote planning.
+- `domain/model_requirements.go`, `domain/model.go`, `domain/resourceplan.go`:
+  workload/envelope/profile declarations, requirements, and estimate provenance.
+- `worker/{runner,protocol,monitor,platform_unix,platform_other,peak,peak_darwin,peak_linux,peak_other}.go`:
+  bounded direct-exec/process ownership.
+- `model/{model,manager,lifecycle,handle,errors}.go`: explicit model state/use ownership,
+  frozen admission, cooperative loader lifecycle, quarantine/refund, safe diagnostics.
+
+Existing `resource.Manager.Acquire(ctx context.Context, req Request) (Lease, error)`
+and Lease `ID() string`/`Release() error` remain. Request adds Heavy and Backend;
+RAMBytes/CPU/GPU/Exclusive are retained. `NewManager(cfg Config) (*BudgetManager, error)`
+constructs the manager (zero value unusable); `Config() Config`, `Snapshot() Snapshot`,
+and `Snapshot.AvailableNow(r Request) (bool, error)` expose copied/advisory state.
+Concrete release is bounded, concurrency-safe, idempotent; no Close/lease expiry.
+
+`ReferenceConfig(cpuCapacity, workerCPU float64, accelerator AcceleratorFacts,
+workerGPU float64, hardwareClass string) Config` requires supplied facts.
+Reference decimal GB=10^9: 16 - 3 system - 4 user - 1.5 Director = 7.5 worker GB;
+MaxParallel=2, MaxHeavy=1, queue=64, heavy threshold=2 GB. Requests ceil and
+capacities floor to 10^6 micro-units using exact round-trippable decimal math.
+Heavy is explicit OR positive GPU OR threshold RAM; false flags cannot bypass it.
+RAM/CPU/GPU/slot/heavy/exclusive grants are atomic; permanent failures never queue.
+FIFO head blocking is intentional; cancel removes/wakes, observed pre-handoff
+cancel rolls back. Successful handoff stays owned until explicit Release.
+Metal != CUDA; GPU shares are logical, not measured VRAM caps. Unified memory
+counts in RAM; no kernel RAM/CPU/GPU containment or ambient hardware detection.
+
+### Frozen profiles, high-water history, advisory planning
+
+ModelRequirements version 1 requires explicit model/profile revisions. Profiles
+declare trusted known load/resident/workspace bounds and supported precision,
+dimensions/frames/quality/offload/chunk envelopes, including cleanup workspace.
+Unknown/untrusted bounds cannot admit locally. Legacy MinMemoryGB is a floor;
+peak=max(load,resident+workspace,ceil(legacyGB*GB),matching observed peak), then
+`ApplySafetyMargin(bytes, percent int64) (int64, error)` (reference 25%).
+No model-name/weights-to-RAM formula. Clone helpers isolate nested declarations.
+
+`NewHistory(limit int) (*History, error)` uses 256 when limit=0; Record/Snapshot/
+Lookup copy exact provider/model/revisions/profile/hardware-class/workload keys.
+Full history returns ErrHistoryFull for new keys, never evicts learned maxima;
+existing updates may raise but not erase peaks. Snapshot Version/Hash/Entries
+provides deterministic provenance, not ambient freshness or automatic persistence.
+FamilyRSS and OS single-process peak remain separately labelled; nil is unknown.
+`EstimateRequest(...) (Estimate, error)` uses frozen declarations/config/history,
+never an LLM-edited ResourcePlan. Exact signature reference: `docs/phases/phase-08.md`.
+`NewPlanner(snapshots SnapshotSource, history HistorySource, cfg PlannerConfig)`
+returns `(*Planner, error)`; `Plan(ctx context.Context, req PlanRequest) (PlanResult, error)`
+distinguishes local_ready/wait/local_ineligible/remote_available. Explicit remote
+policy requires Phase 07 RemoteOnly gates; PreferRemote never permits spending.
+
+### Model API, ownership, and stopped-proof accounting
+
+`model/model.go`: Key{ProviderID, ModelID, Revision}; `Key.Validate() error`.
+LoadSpec owns exact Key/Profile/Workload. Loader: `Identity() Key`,
+`Load(context.Context, LoadSpec) error`, `Unload(context.Context) (stopped bool, err error)`.
+Budget embeds resource.Manager plus `Config() resource.Config`; History exposes
+`Snapshot() resource.HistorySnapshot`, `Record(resource.HistoryKey, resource.Measurement) error`.
+Config has LoadTimeout/UnloadTimeout/SafetyMarginPercent/Now; `DefaultConfig() Config` gives
+cooperative 30s/5s/25%/parent clock. Explicit Config validated, not silently defaulted.
+
+`model/manager.go`: `NewManager(budget Budget, history History, cfg Config) (*Manager, error)`;
+`Register(ctx context.Context, caps domain.ModelCapabilities, loader Loader) error`;
+`Acquire(ctx context.Context, key Key, profileID string, workload domain.Workload) (*UseHandle, error)`;
+`Snapshot() Snapshot`. Register freezes revision-matching copies, never loads/replaces;
+Acquire recomputes current budget/history, not LLM plans; busy transitions refuse, not queue.
+Full peak RAM/CPU/GPU/slot/heavy/exclusive reservation precedes Load and survives
+use release/cancellation. Idle reuse requires exact profile/workload and sufficient
+held reservation; history-raised need returns ErrNeedsUnload, with no nested Acquire.
+
+`model/lifecycle.go`: `Unload(parent context.Context, key Key) error` only refunds
+after stopped proof with matching pre/post identity AND successful lease Release.
+Loader/budget/history/clock callbacks outside mutex, including reentry; identity checked
+on every loader return/error. Failed/late/canceled Load uses fresh bounded cleanup/quarantine.
+Identity-valid Unload true can refund despite callback error/timeout, while reporting
+the error. Failed lease Release retains token/accounting/stopped proof in quarantine;
+explicit Unload retry performs bookkeeping only, not a second loader Unload.
+
+`model/handle.go`: `UseHandle.Key() Key`, `Spec() LoadSpec`, `Estimate() resource.Estimate`;
+`Release() error` is bounded/idempotent/concurrent-safe and only clears use ownership.
+Private shared tokens prevent copied/stale handles from clearing a subsequent owner.
+`RecordMeasurement(measurement resource.Measurement) error`: trusted parent/exact key, stale refused;
+`ObservationError() error`: advisory load-history failure, successful Acquire retains valid handle.
+Owned lexical Models: state/spec/estimate/reservation/StoppedVerified/Observations/HistoryFailures/LastCode;
+no loaders/contexts/tokens/raw diagnostics. States unloaded/reserving/loading/in_use/loaded_idle/unloading/quarantined.
+`model/errors.go` exposes core codes and copied unwrap causes; raw causes need redaction.
+
+### Stable worker API, protocol, and trusted runtime boundary
+
+`worker.NewRunner(c Config) (*Runner, error)`: nil Monitor→NativeMonitor, nil Clock→parent time,
+zero CleanupTimeout→5s; typed-nil monitor pointers/functions rejected, not absent configuration.
+`Runner.Run(ctx context.Context, spec CommandSpec, request Request, limits Limits)`
+returns `(RunResult, error)`. RunResult has Reply, resource.Measurement, Stopped,
+Cleanup, StderrCapturedBytes, StderrTruncated; raw stderr is never returned.
+CommandSpec.Exe is absolute; Argv/CWD/Env are trusted runtime config excluded
+from JSON, never GenerationParams. Nil Env means explicitly empty, not ambient.
+Limits supply positive RAMBytes, optional Timeout, and SampleInterval (zero=100ms).
+
+Protocol version 1 supports only generate; Header has request/provider/model/
+model-revision/profile/profile-revision handles, each 1–128 restricted bytes.
+Request/Reply use bounded RawMessage with existing domain generation DTO codecs.
+Stdin/stdout limit=1 MiB each, stderr capture=8 KiB with excess drained/discarded.
+Wire size is checked before envelope allocation; valid payload bytes are retained.
+Exact-key token scanning rejects aliases/duplicate decoded keys (including escaped
+equivalents) at known DTO boundaries. Extension maps allow case-distinct keys,
+not exact duplicates; error payloads remain opaque/ignored. Successful headers
+must equal the request, and result RequestID must match. Only fixed core diagnostics.
+
+### Stop proof and parent measurements
+
+Unix Setpgid owns a group; one Wait reaps the direct child, owned I/O/monitor tasks
+are joined, and remaining live descendants are killed even on normal leader exit.
+NativeMonitor uses bounded contextual ps queries; failures fail closed, not absence.
+Workers must not daemonize/escape; this is trusted execution, not a malicious-code sandbox.
+`CleanupHandle.RetryStop(ctx context.Context) (bool, error)` requires a deadline.
+Only proven no-live-group/reap/join returns true; false retains a quarantine handle
+and all remaining tasks for explicit retry without duplicate pending query/Wait.
+**True can accompany ErrLimitExceeded**: stopped proof and sticky RAM breach are
+separate facts. Caller retains its lease on uncertain stop; worker never acquires/
+refunds leases. Descendant zombies are distinguished; adoptive parent reaps them.
+
+Run and cleanup observations share high-water/breach accounting. Cleanup-only
+breaches retain partial evidence, suppress Reply, and still finish stop proof.
+Active monitor failures after leader reap remain errors; intentional canceled
+observations ignored. Family RSS, OS process peak, and parent milliseconds have distinct
+source/completeness; missing metrics nil. macOS peak bytes/Linux KiB converted; no instant wall.
+
+### Reviewed implementation — final checks and phase commit
+
+Lead reports post-history-correction targeted/scoped normal/race/vet PASS and
+fresh worker/resource/domain normal, worker race/vet PASS; typed-nil red/green
+and lead rerun PASS. Supplementary Astra audit began 2026-10-10; M1–M3 MEDIUM
+and L1 LOW are closed, component APPROVE on 2026-10-11, not formal phase Review 1/2.
+Independent original five overlay regressions/race/native-helper/scoped checks PASS.
+Lead Linux/arm64 and Windows/amd64 cross-builds PASS; worker-owner Darwin/Linux
+arm64 test-compilation PASS is reported. macOS helper/pipe cleanup unit/race PASS;
+Linux runtime unverified, Windows Run explicitly unsupported.
+Original model writer canceled before tests; five production files preserved, not
+rewritten (formatting only). Bounded replacement supplied three manager smoke tests;
+lead independent model normal/race/vet PASS. Peer test-only lifecycle/ownership
+files each add five tests, targeted normal/race/vet PASS reported; no production fix needed.
+Main `go test -count=1 -timeout=120s ./...`, `go test -race -count=1 -timeout=180s ./...`,
+`go build ./...`, `go vet ./...`: PASS by lead execution and Terra's independent
+formal review rerun. Luna independently passed tests/race/vet/Linux+Windows builds/diff checks.
+Final post-review lead rerun PASS; formatting/whitespace, staged diff, and
+157-tracked-file hygiene checks pass. Single commit:
+`phase(08): implement resource and model management` (resolve hash from history).
+No tests run by documentation owner; no real ML/inference/network/installs introduced.
+Formal evidence: `docs/reviews/phase-08-review-terra.md`, `docs/reviews/phase-08-review-luna.md`;
+Astra worker audit remains supplementary. Phase evidence/resume: `docs/phases/phase-08.md`,
+`docs/handoffs/next-session-phase-08.md`. Planned commit: `phase(08): implement resource and model management`.

@@ -1007,3 +1007,128 @@ Exact evidence/retest provenance and lead-owned review paths are in the phase
 evidence. Single commit: `phase(07): implement provider registry and routing`
 (resolve its hash from repository history). Final §14 checks and hygiene pass;
 the lead continues Phase 08 automatically under §0.2, without a fresh prompt/push.
+
+---
+
+## ADR-021: Phase 08 declared resource admission, model ownership, and bounded workers
+
+**Date:** 2026-10-10
+**Status:** Implementation reviewed; ready for local phase commit subject to final checks, not DONE (2026-10-11)
+
+**Context and authority:** Phase 08 starts from `dbc5ace`, completed Phase 07.
+`PHASES.md` §0.2 and the Phase 08 lead-policy section govern these decisions.
+The owner delegated routine conservative phase decisions to the lead; this is
+not individual owner approval of every default. Continue in roadmap order
+without a fresh prompt, retaining every verification/review/commit gate.
+Consequential cost, downloads, security, licensing, scope, and publication
+decisions retain owner approval. No paid generation or automatic push.
+
+**Decision (required policy, not an as-built API description):**
+
+- Preserve resource Request/Manager/Lease and domain ResourcePlan contracts;
+  add only missing heavy/accelerator flags, backend facts, model execution
+  requirements, estimate provenance, and declared revisioned profiles. Freeze
+  shared contracts before disjoint model/worker implementation.
+- Supply physical capacity and reserves explicitly, with decimal GB = 10^9
+  bytes. Reference RAM: 16 GB total - 3 GB system - 4 GB user - 1.5 GB Director
+  = 7.5 GB workers. Validate reserves/caps; CPU and accelerator facts are explicit.
+  Reference MaxParallel=2, MaxHeavy=1, queue limit=64, heavy threshold=2 GB.
+- Deterministic code grants RAM/CPU/GPU/slot/heavy/exclusive reservations
+  atomically. RAM uses integer bytes; fractional CPU/GPU requests round up and
+  capacities round down to fixed micro-units. Reject invalid, incompatible,
+  overflowing, or permanently over-budget requests before queueing. Heavy means
+  explicit heavy OR positive GPU OR RAM at/above threshold; false flags cannot bypass it.
+- Bounded FIFO intentionally blocks behind its head. Remove canceled tickets
+  and wake eligible waiters; roll back grants when cancellation is observed
+  before handoff. Leases remain caller-owned, never auto-expire/refund while
+  work may run. Concrete Release is bounded, concurrency-safe, idempotent;
+  snapshots are copied.
+- Declare accelerator backend/capacity and unified/discrete memory explicitly:
+  Metal is not CUDA. GPU units are logical shares, not instantaneous OS VRAM
+  limits; unified allocations count in RAM. Unknown positive requirements fail
+  local eligibility. CPU units are logical admission, not OS execution limits.
+- Freeze model/profile revisions with known load/resident/workspace bounds and
+  supported precision, dimensions, frames, quality, offload, and chunk envelopes.
+  Legacy minimum RAM is a floor, not a peak; reference configurable safety
+  margin is 25%. Unknown/unbounded profiles fail local admission. Do not invent
+  model-name or weights-to-RAM formulas.
+- Bound copied history to a reference 256 exact model-revision/profile/hardware/
+  workload keys. Keep parent-measured peaks, load/run/unload timings, source,
+  completeness, and deterministic snapshot provenance. History only raises
+  estimates, never lowers them from sparse samples. At capacity reject new keys
+  with ErrHistoryFull, preserving learned high-water evidence; existing keys may
+  still update. No eviction-based forgetting. No raw prompts/paths,
+  ambient state, or automatic persistence; unknown accelerator measurements are
+  unknown, not zero.
+- Refuse busy/reserving/loading/unloading conflicts. Reserve full peak RAM/CPU/
+  GPU/slot/heavy resources before load and hold them until explicit Unload.
+  Use-handle Release clears use ownership only. No nested worker acquisition,
+  hidden eviction, or automatic live-resource refund. Recompute admission from
+  frozen profiles, never caller/LLM-edited ResourcePlans.
+  Same profile/exact workload and sufficient held reservation only for idle reuse;
+  otherwise explicit unload. Model source now implements this delegated lead policy.
+- Invoke cooperative loader callbacks outside locks; verify identity before/
+  after every callback return, including errors. Reference load timeout is 30s,
+  unload/cleanup 5s. Failed, canceled, or late loads require separately bounded
+  cleanup contexts. Free the lease only with stopped proof; uncertain cleanup
+  quarantines the reservation for explicit retry.
+- Execute workers directly via os/exec, never shell text/Python embedding.
+  Trusted runtime configuration owns executable/argv/cwd/environment, not
+  GenerationParams. Versioned JSON stdin/stdout are bounded at reference 1 MiB
+  each, stderr at 8 KiB. Validate successful source IDs and request/replay
+  correlations; ignore payloads accompanying errors. Diagnostics use safe core codes.
+- Own one Unix process group and one Wait path; workers must not daemonize or
+  escape. Native macOS/Linux family RSS sampling runs at reference 100ms and
+  fails closed on sampling errors. Cancellation, breach, protocol failure, and
+  normal exit all require family termination, reap, and reader/monitor joins
+  before stopped proof. Reference cleanup timeout is 5s; unsupported platforms
+  fail explicitly. Sampling detects breaches, not an instantaneous kernel hard wall.
+- Distinguish permanent local ineligibility, temporary wait, and remote candidates
+  gated by Phase 07. PreferRemote is advice, not authority to spend or execute.
+  No model downloads, vendor installs, real inference, or cloud calls in this phase.
+
+**Consequence and evidence boundary:** Conservative admission protects declared
+capacity without promising OS containment or complete accelerator measurements.
+Resource/domain APIs are frozen and core is lead-inspected; post-history-fix
+targeted retention and scoped normal/race/vet PASS are lead-reported. ErrHistoryFull
+rejects new keys without eviction; existing updates preserve/raise learned peaks.
+Worker is implemented/lead-inspected; fresh scoped normal/race/vet PASS, including
+typed-nil monitor pointer/function constructor red/green and lead rerun. Runtime
+config is JSON-excluded, nil environment explicitly empty; strict bounded exact-key
+wire validation prevents alias/duplicate DTO/raw-byte identity disagreement.
+Cleanup samples retain high-water/sticky breach evidence; RetryStop true may
+accompany ErrLimitExceeded. Active monitor failure after reap is retained; only
+intentionally canceled observations are ignored. Uncertain stop retains owned
+tasks/cleanup handle and caller lease; worker never acquires/refunds resources.
+Supplementary Astra worker audit started 2026-10-10; 3 MEDIUM + 1 LOW fixes have
+owner red/green and lead retest proof. Astra component APPROVE on 2026-10-11
+confirmed original five overlay/race/native-helper/scoped checks PASS. It is not
+formal whole-phase Review 1/2. Cross-build/compile successes do not establish Linux
+runtime support verification; Windows Run remains explicitly unsupported.
+Model implementation is present and source-inspected, including exact Key/LoadSpec/
+Loader/Budget/History/Manager/UseHandle/Snapshot APIs. Full reservation survives use
+release; stopped proof and successful lease Release are both required for refund.
+Identity-valid stopped=true may accompany an error; report it without discarding
+proof. Failed lease Release retains proof/token/accounting in quarantine; retry
+bookkeeping without another loader Unload. External callbacks stay outside locks.
+Trusted measurements retain exact keys/copied observations; history failures are
+counted/advisory and do not invalidate a successfully loaded handle.
+Original model owner canceled before tests; preserve its five production files
+(formatting only), no rewrite/production fix. Replacement three smoke tests and
+lead model normal/race/vet PASS; two completed test-only suites each add five
+Failure/Ownership tests with targeted normal/race/vet PASS reported. No active writers.
+Whole as-built draft: `ARCHITECTURE.md`; source/test provenance: `docs/phases/phase-08.md`.
+Main full unit/race/build/vet gate PASS, independently rerun by Terra (PASS). No
+code tests run by documentation owner; implementation presence is not phase completion.
+Completed formal reviews (2026-10-11):
+terra (`amazon-bedrock/openai.gpt-5.6-terra`) then luna
+(`amazon-bedrock/openai.gpt-5.6-luna`), roster/catalog verified by the lead;
+Terra APPROVE then Luna APPROVE sequentially; no code defect reported by Terra,
+its LOW stale-gate documentation finding closed. Luna has no outstanding findings;
+independent tests/race/vet/Linux+Windows builds/diff checks PASS. Formal evidence:
+`docs/reviews/phase-08-review-terra.md`, `docs/reviews/phase-08-review-luna.md`.
+Final post-review lead full uncached test/race/build/vet rerun PASS; formatting/
+whitespace, staged diff, and hygiene checks pass. Completion is recorded in one
+`phase(08): implement resource and model management` commit; resolve hash from history.
+Resume without rebuilding completed core or requesting a routine fresh prompt;
+checkpoint/roles/next gates: `docs/handoffs/next-session-phase-08.md`.

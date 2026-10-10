@@ -16,8 +16,11 @@ type ModelCapabilities struct {
 	ProviderID  string   `json:"providerId"`
 	Tags        []string `json:"tags"`
 	Local       bool     `json:"local"`
-	MinMemoryGB float64  `json:"minMemoryGb,omitempty"`
+	MinMemoryGB float64  `json:"minMemoryGb,omitempty"` // Legacy decimal-GB floor, never a peak estimate.
 	RequiresGPU bool     `json:"requiresGpu,omitempty"`
+	// Requirements must come from trusted adapter/configuration declarations,
+	// not generated plans. Nil requirements cannot admit local execution.
+	Requirements *ModelRequirements `json:"requirements,omitempty"`
 }
 
 // Supports reports whether the model declares the given capability tag.

@@ -8,11 +8,15 @@ package domain
 // budgets. "The LLM must never be the authority enforcing resource
 // limits" (PHASES.md section 3).
 type ResourcePlan struct {
-	ID           ID      `json:"id"`
-	TargetID     ID      `json:"targetId"`
-	RAMBytes     int64   `json:"ramBytes"`
-	CPU          float64 `json:"cpu,omitempty"`
-	GPU          float64 `json:"gpu,omitempty"`
-	PreferRemote bool    `json:"preferRemote,omitempty"`
-	Rationale    string  `json:"rationale,omitempty"`
+	ID           ID                  `json:"id"`
+	TargetID     ID                  `json:"targetId"`
+	RAMBytes     int64               `json:"ramBytes"`
+	CPU          float64             `json:"cpu,omitempty"`
+	GPU          float64             `json:"gpu,omitempty"`
+	PreferRemote bool                `json:"preferRemote,omitempty"`
+	Rationale    string              `json:"rationale,omitempty"`
+	Heavy        bool                `json:"heavy,omitempty"`
+	Exclusive    bool                `json:"exclusive,omitempty"`
+	Backend      AcceleratorBackend  `json:"backend,omitempty"`
+	Provenance   *EstimateProvenance `json:"provenance,omitempty"`
 }

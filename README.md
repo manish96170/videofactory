@@ -13,7 +13,7 @@ Prompt → Director → VideoPlan → Shot Planner → Shot Intelligence
 
 ## Status
 
-Phase 07 (Provider System / Router). See `ROADMAP.md` for phase status
+Phase 08 (Model Manager / Resource Planner). See `ROADMAP.md` for phase status
 and `ARCHITECTURE.md` for the as-built architecture.
 
 ## Requirements

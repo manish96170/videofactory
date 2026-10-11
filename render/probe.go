@@ -17,11 +17,12 @@ const durationTolerance = 150 * time.Millisecond
 
 // ProbeResult is the subset of ffprobe's output this package checks.
 type ProbeResult struct {
-	Duration  time.Duration
-	Width     int
-	Height    int
-	CodecName string
-	FPS       float64
+	Duration    time.Duration
+	Width       int
+	Height      int
+	CodecName   string
+	FPS         float64
+	AudioTracks int // count across all streams, independent of video ordering
 }
 
 type ffprobeOutput struct {
@@ -56,6 +57,12 @@ func Probe(ctx context.Context, path string) (ProbeResult, error) {
 		return ProbeResult{}, fmt.Errorf("render: parse ffprobe duration %q for %s: %w", raw.Format.Duration, path, err)
 	}
 
+	audioTracks := 0
+	for _, s := range raw.Streams {
+		if s.CodecType == "audio" {
+			audioTracks++
+		}
+	}
 	for _, s := range raw.Streams {
 		if s.CodecType != "video" {
 			continue
@@ -65,11 +72,12 @@ func Probe(ctx context.Context, path string) (ProbeResult, error) {
 			return ProbeResult{}, fmt.Errorf("render: parse ffprobe frame rate %q for %s: %w", s.RFrameRate, path, err)
 		}
 		return ProbeResult{
-			Duration:  time.Duration(durSeconds * float64(time.Second)),
-			Width:     s.Width,
-			Height:    s.Height,
-			CodecName: s.CodecName,
-			FPS:       fps,
+			Duration:    time.Duration(durSeconds * float64(time.Second)),
+			Width:       s.Width,
+			Height:      s.Height,
+			CodecName:   s.CodecName,
+			FPS:         fps,
+			AudioTracks: audioTracks,
 		}, nil
 	}
 

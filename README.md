@@ -13,8 +13,12 @@ Prompt → Director → VideoPlan → Shot Planner → Shot Intelligence
 
 ## Status
 
-Phase 08 (Model Manager / Resource Planner). See `ROADMAP.md` for phase status
-and `ARCHITECTURE.md` for the as-built architecture.
+Completed through Phase 08 (Model Manager / Resource Planner). Phase 09
+(Validation / Shot Intelligence) is **IN PROGRESS**: implementation and Astra R1
+fixes pass the full gate, while the required Terra review and closeout remain; it is
+not release-ready. Historical resume checkpoint:
+[`docs/handoffs/next-session-phase-09.md`](docs/handoffs/next-session-phase-09.md).
+See `ROADMAP.md` for phase status and `ARCHITECTURE.md` for the as-built architecture.
 
 ## Requirements
 

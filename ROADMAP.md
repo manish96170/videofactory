@@ -15,7 +15,7 @@ the authoritative source; this file mirrors them and must stay in sync.
 | 06    | Decision Engine                              | DONE        |
 | 07    | Provider System / Router                     | DONE        |
 | 08    | Model Manager / Resource Planner             | DONE        |
-| 09    | Validation / Shot Intelligence               | NOT STARTED |
+| 09    | Validation / Shot Intelligence               | IN PROGRESS |
 | 10    | Preview / Checkpoint / Cache / Visual Review | NOT STARTED |
 | 11    | Audio / Timestamp / Temporal Intelligence    | NOT STARTED |
 | 12    | TUI Control Plane / Visual Review            | NOT STARTED |
@@ -27,6 +27,12 @@ the authoritative source; this file mirrors them and must stay in sync.
 | 18    | Public Repository / Release Readiness        | NOT STARTED |
 
 ## First milestones (PHASES.md section 29)
+
+Phase 09 checkpoint (2026-10-11): the historical intelligence ownership failures
+(one HIGH and one MEDIUM) are fixed with retained acceptance coverage. Lead full
+uncached gate passes and Astra R1 approved its follow-up fixes; Terra review and the
+phase commit remain pending. Phase 10 has not started. Historical continuation:
+[`docs/handoffs/next-session-phase-09.md`](docs/handoffs/next-session-phase-09.md).
 
 1. Manual `VideoPlan` → 3 deterministic shots → deterministic renderer → MP4.
 2. Prompt → Director → `VideoPlan` → deterministic renderer → MP4.

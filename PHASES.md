@@ -1823,6 +1823,59 @@ Resource limits must be enforced by code, not by LLM instructions.
 
 Prevent expensive generation when cheaper deterministic approaches are sufficient.
 
+## Lead decisions under delegated routine-policy authority (2026-10-11)
+
+- Deliver two bounded tranches: `validation/` plus narrow native/render helpers,
+  then `intelligence/` after its validation API freezes. One source/test owner
+  per tranche; no oversized all-in-one implementation assignment.
+- Reuse `domain.ValidationResult` unchanged; details contain bounded core-owned
+  issue/severity codes, not paths, raw native errors, or arbitrary asset metadata.
+  Invalid requirements/dependencies/caller cancellation return safe errors;
+  observed media failure returns a failed result. Retry advice defaults false.
+- Quality is explicit: expected duration/FPS/width/height and draft/final label,
+  with no resolution invented from the label. Reference tolerances: duration
+  ±150ms and FPS ±0.01; require finite/positive values and safe conversions.
+  Reuse existing domain.Quality rather than a parallel quality vocabulary.
+  GenerationResult.DurationMs is wall time, never media duration.
+- Inspect only authorized regular local files; reject network/protocol URIs and
+  escapes outside configured roots. Native query/decode is synchronous and
+  context-bounded, with bounded output, restricted formats/protocols, and source
+  size/dimension limits. Reference timeout 5s, file limit 1 GB, 64 KiB metadata/
+  diagnostic capture, source <=16,777,216 pixels and <=8192 per dimension;
+  allocation guards are not kernel containment. No arbitrary network fetch.
+- Measure video/audio/image facts rather than trusting Asset.Metadata. Count
+  audio tracks independent of stream order; require audio only when explicitly
+  requested, validate audio stream facts and bounded decodability. Decode one
+  small bounded thumbnail for visual presence. Static/flat/dark shots and fades
+  are valid; optional uniform-frame checks are warnings, not semantic/motion QA.
+- Asset reuse requires explicitly associated candidate IDs from the authoritative
+  project plus affirmative suitability and verified kind/quality. Shot.DependsOn
+  references shots, not assets; do not invent persistent ShotRef fields or search
+  every project asset for vague matches. Image substitution/animation needs a
+  verified image and positive suitability; unknown/uncertain/error blocks that choice.
+- Deterministic facts precede optional decision.Engine classifications. Registry
+  deterministic capability is conceptual; a renderer-owned support query separately
+  reports current Background/Image/Text/Transition support. Unsupported exact
+  deterministic content never becomes AI solely because a provider is absent.
+- Return advisory provider.RouteResult and optional resource.PlanResult only with
+  matching trusted provider/model/profile/workload facts. Preserve all Phase 07
+  health/tag/locality/cost/latency/hardware gates, local-only default, and Phase 08
+  local_ready/wait/ineligible/remote statuses. Missing resource profiles are unknown,
+  not ready. No budget acquisition, model load, generation, cache/player, speech,
+  installs, or actual paid/cloud calls in scope.
+- Audio-required new-video strategies require explicit caller-declared
+  AudioRequiredTags, not arbitrary unrelated routing tags. Eligibility tags do
+  not prove composed audio; verified audio-bearing video reuse is separate.
+  Current intelligence resource evidence is attested only for local-only bindings;
+  AnyLocality/remote resource readiness remains unknown rather than falsely ready.
+- Callback/native cancellation is checked before/after and late success rejected;
+  error-accompanying payloads ignored, metadata/slices copied, typed-nil required
+  dependencies rejected. Safe diagnostics retain causes without public raw text.
+  Only explicitly transient inspection errors/child timeouts merit retry advice;
+  permanent missing/unauthorized/invalid/limited media or runtime failures override
+  wrapped transient markers. Nil contexts are invalid requests, not panics.
+  No automatic retries or permission to spend. Reviews: verified astra then terra.
+
 Pipeline:
 
 ```text
@@ -1834,30 +1887,52 @@ Shot
 
 ## TODO
 
-- [ ] deterministic feasibility check
-- [ ] asset reuse check
-- [ ] image-vs-video check
-- [ ] animate-existing-image check
-- [ ] local-vs-cloud check
-- [ ] provider eligibility check
-- [ ] quality requirements
-- [ ] validation rules
-- [ ] video metadata validation
-- [ ] duration validation
-- [ ] frame-rate validation
-- [ ] resolution validation
-- [ ] audio validation
-- [ ] basic visual checks
-- [ ] failure classification
-- [ ] retry recommendation
-- [ ] tests
-- [ ] Agent review #1
-- [ ] Fix
-- [ ] Agent review #2
-- [ ] Fix
-- [ ] Evidence
-- [ ] Docs
-- [ ] Commit
+- [-] deterministic feasibility check
+- [-] asset reuse check
+- [-] image-vs-video check
+- [-] animate-existing-image check
+- [-] local-vs-cloud check
+- [-] provider eligibility check
+- [x] quality requirements
+- [x] validation rules
+- [x] video metadata validation
+- [x] duration validation
+- [x] frame-rate validation
+- [x] resolution validation
+- [x] audio validation
+- [x] basic visual checks
+- [x] failure classification
+- [x] retry recommendation
+- [x] tests (lead full uncached test/race/vet/build gate passes after acceptance and R1 regressions)
+- [x] Agent review #1 (astra — approval after R1 fixes; see `docs/reviews/phase-09-review-astra.md`)
+- [x] Fix (P09-A1/A2 and four in-scope Astra MEDIUM findings resolved and retested)
+- [x] Agent review #2 (terra — approval after documentation/evidence confirmation; see `docs/reviews/phase-09-review-terra.md`)
+- [x] Fix (Terra MEDIUM documentation/evidence reconciliation resolved and confirmed)
+- [x] Evidence (both formal reviews recorded)
+- [x] Docs (as-built architecture, ADR, roadmap, checkpoint history, and review evidence reconciled)
+- [x] Commit (`phase(09): implement validation and shot intelligence`)
+
+## Historical context-rollover checkpoint (2026-10-11, superseded on resume)
+
+Owner requested handoff at approximately 88% context. Stop implementation safely;
+do not apply production fixes or start formal reviews in this session. Resume from
+`docs/handoffs/next-session-phase-09.md`. HEAD `61e078b`, branch main; Phase 09
+changes are dirty and unstaged, with no active source/test writers.
+
+Validation is tested/frozen. Intelligence source and four focused tests exist;
+five additional acceptance functions expose two unresolved ownership bugs:
+
+- HIGH P09-A1: `snapshot(req, &req)` in `Analyzer.Analyze` decodes into existing
+  caller-aliased state. Decode into a fresh zero-valued Request before assignment.
+- MEDIUM P09-A2: router callback receives retained `policy` without another Clone;
+  mutations can change downstream admission. Pass `policy.Clone()` to the callback.
+
+The lead independently reproduced the ownership subtest failure in normal and
+race runs (same assertions, no race-detector diagnostics). Checkpoint full build
+and vet PASS, but the full current Phase 09 test/race gate has not passed. No fixes
+have been applied; tests must not be weakened. Test-engineering evidence is in
+`docs/reviews/phase-09-acceptance-findings.md`, NOT a formal phase review. Astra →
+Terra formal reviews and the full Phase 09 completion gate remain pending.
 
 ---
 
@@ -3047,7 +3122,7 @@ The main session must maintain this section as the authoritative high-level prog
 [x] PHASE 06 — Decision Engine
 [x] PHASE 07 — Provider System / Router
 [x] PHASE 08 — Model Manager / Resource Planner
-[ ] PHASE 09 — Validation / Shot Intelligence
+[x] PHASE 09 — Validation / Shot Intelligence
 [ ] PHASE 10 — Preview / Checkpoint / Cache / Visual Review
 [ ] PHASE 11 — Audio / Timestamp / Temporal Intelligence
 [ ] PHASE 12 — TUI Control Plane / Visual Review
@@ -3197,6 +3272,29 @@ is recorded by the single `phase(08): implement resource and model management`
 commit containing this update. Phase 08 is DONE; Phase 09 follows automatically
 under §0.2. No automatic push. Linux runtime coverage remains a documented
 follow-up, not a completed verification claim.
+
+Historical Phase 09 start/checkpoint (2026-10-11; superseded on resume): automatic continuation from clean commit `61e078b`.
+Phase 08 final full gate validates the unchanged baseline; fresh project/provider/
+render checks pass. Read-only design scout completed, and conservative
+lead policy is recorded above. Validation core precedes shot intelligence after
+API freeze; formal reviewers astra (`amazon-bedrock/us.openai.gpt-6-astra`) then
+terra (`amazon-bedrock/openai.gpt-5.6-terra`) verified in roster/catalog.
+Validation core is implemented; lead inspected quality/native/security/probe
+changes and independently reran validation/render unit/race/vet (PASS). Three
+bounded self-review refinements are complete: domain.Quality reuse, nil-context
+guards, and permanent-failure retry precedence, all with red/green regressions
+and fresh lead scoped checks (PASS). ADR-022/draft evidence exists; validation API
+is frozen. Intelligence source and four focused tests are implemented; audio-intent,
+binding provenance/locality, and validation severity gaps were corrected and scoped
+unit/race/vet passed before additional acceptance coverage. Test-only owner
+`ses_ed65f4c94ffeTZ6HrDMiQvAj6g` completed five acceptance functions and found
+HIGH P09-A1 caller-snapshot aliasing and MEDIUM P09-A2 retained router-policy aliasing.
+Lead independently reproduced normal and race ownership failures; checkpoint
+full build/vet PASS. Both bugs are UNFIXED;
+no active writers. Phase 09 full test/race gate has not passed. Formal Astra → Terra
+reviews have NOT STARTED. Owner requested context rollover at about 88%; docs and
+`docs/handoffs/next-session-phase-09.md` checkpoint preserve exact continuation.
+Phase 09 remains IN PROGRESS; no commit/push and no later-phase implementation.
 
 ---
 

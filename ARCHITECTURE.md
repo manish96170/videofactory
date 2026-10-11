@@ -1169,3 +1169,95 @@ No tests run by documentation owner; no real ML/inference/network/installs intro
 Formal evidence: `docs/reviews/phase-08-review-terra.md`, `docs/reviews/phase-08-review-luna.md`;
 Astra worker audit remains supplementary. Phase evidence/resume: `docs/phases/phase-08.md`,
 `docs/handoffs/next-session-phase-08.md`. Planned commit: `phase(08): implement resource and model management`.
+
+## Phase 09 — Validation / Shot Intelligence (as-built, closeout pending)
+
+**IN PROGRESS — REVIEW/CLOSEOUT PENDING (2026-10-11).** Above `61e078b`; no Phase 09
+commit. The historical ownership bugs are fixed, the lead full gate passes, and Astra
+approved; Terra evidence confirmation remains. No active code/test writers. This
+section is as-built documentation, not phase completion.
+
+### Measured validation API and result boundary
+
+- `validation/validation.go`: `Quality = domain.Quality`, with shared draft/final
+  constants. `Requirements` explicitly supplies Kind/Quality/ExpectedDuration/FPS/
+  Width/Height, AudioRequired, ImageMinimumDimensions, and WarnUniformFrame.
+  `Requirements.Validate()` checks kind-specific applicable fields and finite bounds.
+- `NewMediaChecker(inspector Inspector, cfg Config) (*MediaChecker, error)`;
+  `Validate(ctx context.Context, req Request) (domain.ValidationResult, error)`.
+  Request has ID/TargetID/Asset/Requirements; domain result/envelope is unchanged.
+  `DefaultConfig()` is 5s, ±150ms duration, ±0.01 FPS; no label-derived resolution.
+  `GenerationResult.DurationMs` is generation wall time, never media duration.
+- `Inspector.Inspect(context.Context, InspectionRequest) (InspectionFacts, error)`;
+  request URI/Kind, measured Kind/Duration/Width/Height/FPS/CodecName, AudioTracks/
+  SampleRate/Channels, VisualDecoded/AudioDecoded, optional UniformFrame.
+  Asset.Metadata is neither trusted nor passed to the inspector.
+- Invalid dependencies/requirements/nil context are errors; parent cancellation
+  wins and late/error payloads are ignored. Media failures return failed results;
+  `Details` contains quality plus bounded core `Issue{Code, Severity}` values.
+  Status is passed/failed/warning. Safe errors unwrap causes for `errors.Is/As`;
+  raw causes require redaction. Retry advice is false unless explicitly transient/
+  child timeout; permanent source/media/runtime/limit markers override retry.
+
+### Native boundary and narrow renderer changes
+
+- `validation/native.go`: `DefaultNativeConfig(roots ...string) NativeConfig`,
+  `NewManagedNativeInspector(cfg NativeConfig) (*ManagedNativeInspector, error)`;
+  `Inspect(ctx, InspectionRequest) (InspectionFacts, error)`.
+  Trusted config owns roots/RelativeRoot/WorkingDir/executable selection/timeout.
+  Empty roots are rejected; regular authorized local files only, no protocol URIs
+  or symlink/root escapes. Opened-file identity is checked, not a hostile-FS sandbox.
+- Source <=1,000,000,000 bytes; <=8192 per dimension and <=16,777,216 pixels.
+  PNG/JPEG/GIF use DecodeConfig guards then image.Decode (not all GIF animation frames).
+  Video/audio header selects forced mov/matroska/wav/flac/mp3 demuxer; file-only
+  protocols, MOV external references disabled, decoder stdin disabled, one thread.
+- Strict bounded native JSON rejects unknown/duplicate keys and invalid numbers;
+  audio tracks count independently of stream order, every audio stream's facts
+  checked. Decode one 8x8 midpoint thumbnail and first audio stream's first 20ms.
+  Uniform frame is opt-in warning only; flat/static/dark/fade content remains valid.
+- `validation/process.go`: direct contextual exec, no shell; stdout <=64 KiB,
+  stderr <=8 KiB, breach cancels, raw stderr omitted. Timeout defaults 5s.
+  Per-allocation/native guards are not aggregate/kernel RAM/CPU/GPU containment.
+- `render/probe.go` counts `ProbeResult.AudioTracks` across all streams;
+  `render.SupportsPrimitive` in `render/support.go` reports Background/Image/Text/
+  Transition only, not properties, tool availability, or conceptual registry support.
+
+### Advisory intelligence API and current limitations
+
+- `intelligence/{intelligence,helpers}.go`: `New(primitives Primitives,
+  validator validation.Validator, router Router, decider Decider, planner Planner)
+  (*Analyzer, error)`; `Analyze(ctx context.Context, req Request) (Result, error)`.
+  Primitives/validator/router required; optional typed-nil decider/planner absent.
+- Request supplies authoritative Project/ShotID/ID, explicit VIDEO requirements
+  with shot-matching duration, <=8 distinct Candidates and <=16 trusted Bindings.
+  Candidate has AssetID and typed Suitable/ImageSufficient/AnimationSuitable verdicts;
+  <=8 distinct AudioRequiredTags explicitly attest requested composition capability,
+  not arbitrary route tags. Association never means asset IDs in Shot.DependsOn.
+- Strategies are Deterministic/ReuseVideo/StaticImage/AnimateImage/GenerateVideo/
+  OpNone, all advice. Result separates ConceptualPossible/RenderedSupport/InputsReady,
+  MissingAudioReadiness, source/judgment/validation evidence, routing/resource status.
+  Known cheap facts bypass classification; unsupported deterministic intent stays
+  deterministic. Only associated project assets are measured; suitability must be positive.
+- Optional structured Decider (including decision.Engine) receives a bounded scalar
+  descriptor: duration/count/candidate presence/dimensions/FPS/audio, no prose or
+  primitive-type detail. This limits semantic usefulness; unknown/uncertain/errors
+  cannot manufacture a choice. Callbacks have cooperative 5s bounds, no retries.
+- Routing adds exact capability/audio tags without relaxing Phase 07 policy.
+  Optional resource advice checks selected provider/model/profile/revisions/workload/
+  provenance. Local-only matching evidence preserves local_ready/wait/local_ineligible.
+  Any/Remote routing can be explicitly requested, but resource evidence stays unknown:
+  RouteResult cannot attest locality. No implemented remote_available bridge is claimed.
+- `Analyze` snapshots JSON-compatible input into a fresh Request before callbacks;
+  router and planner callbacks receive independent policy/request copies while the
+  analyzer retains the trusted binding baseline for provenance checks. Router output
+  is copied and shape/vocabulary checked before advice is exposed. Frame counts use
+  round-trippable decimal FPS values. Native deadline handling preserves permanent
+  media/limit markers for retry classification while parent cancellation remains
+  authoritative. These are advisory safety boundaries, not execution permission.
+- No generation/render execution, resource acquisition/model loading, cache/player,
+  speech/timestamps, provider installs/downloads, paid calls, or new domain schema.
+
+The historical acceptance RED checkpoint is retained in phase evidence. After the
+ownership and Astra R1 boundary fixes, the lead full uncached test/race/vet/build gate
+passes and Astra approved. Terra review and phase closeout remain pending.
+Evidence: `docs/phases/phase-09.md`; resume: `docs/handoffs/next-session-phase-09.md`.

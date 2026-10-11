@@ -1132,3 +1132,126 @@ whitespace, staged diff, and hygiene checks pass. Completion is recorded in one
 `phase(08): implement resource and model management` commit; resolve hash from history.
 Resume without rebuilding completed core or requesting a routine fresh prompt;
 checkpoint/roles/next gates: `docs/handoffs/next-session-phase-08.md`.
+
+---
+
+## ADR-022: Phase 09 measured local validation and deterministic-first shot advice
+
+**Date:** 2026-10-11
+**Status:** Accepted delegated lead policy; implementation and Astra R1 fixes verified,
+Terra closeout pending
+
+**Context and authority:** Phase 09 starts from `61e078b`, completed Phase 08.
+`PHASES.md` §0.2/Phase 09 govern: the owner authorized continued roadmap execution
+and delegated conservative routine decisions to the lead, not individual approval
+of every default. All gates remain; cost/download/security/licensing/scope/publication
+choices still require owner approval. No paid calls, automatic push, or gate bypass.
+
+**Decision (required policy, not an as-built API description):**
+
+- Deliver bounded `validation/` plus narrow native/render helpers first, then
+  `intelligence/` only after validation API freeze; one source/test owner per tranche.
+- Reuse `domain.ValidationResult` unchanged, with no parallel result boolean or
+  schema requirement. Its `Details` holds bounded core-owned issue/severity codes,
+  not arbitrary metadata, URIs, paths, keys, or raw native diagnostics. Invalid
+  requirements/dependencies and parent cancellation return safe Go errors; observed
+  media failures return failed results. Preserve causes for `errors.Is/As` without
+  exposing their raw text in public diagnostics. Retry advice defaults false.
+- Quality explicitly supplies expected duration/FPS/width/height and draft/final
+  label; no label-to-resolution magic. Require finite positive values and safe
+  conversions; reference tolerances are ±150ms duration and ±0.01 FPS.
+  Reuse `domain.Quality` via a type alias, not a parallel quality vocabulary.
+  `GenerationResult.DurationMs` measures generation wall time, never media duration.
+- Treat `domain.Asset` (ID/Kind/URI/Metadata) as untrusted media input. Measure local
+  facts rather than trusting Metadata. Inspect authorized regular files within
+  configured roots only; empty roots authorize nothing. Reject network/protocol
+  URIs and symlink/root escapes; no arbitrary network fetch.
+- Native query/decode is synchronous and context-bounded, with restricted formats/
+  protocols and bounded output/allocation guards. Reference timeout 5s, file size
+  1 GB, metadata/diagnostic capture 64 KiB, dimensions <=8192 each and source pixels
+  <=16,777,216. These guards do not promise kernel RAM/CPU/GPU containment.
+- Count actual audio streams independent of order; audio is required only explicitly.
+  Validate audio facts and bounded decodability. Decode one small bounded thumbnail
+  for visual presence. Static/flat/dark shots and fades remain valid; optional
+  uniform-frame checks warn, not fail semantic/motion quality assurance.
+- Reuse only explicitly associated candidate IDs resolved in authoritative
+  `Project.Assets`, with verified kind/quality and affirmative suitability. Association
+  is caller input, not a new persistent ShotRef; `Shot.DependsOn` names shots, not
+  assets. No vague whole-project asset search. Image substitution/animation requires
+  a verified image and positive suitability; unknown/uncertain/error blocks that choice.
+- Deterministic facts precede optional `decision.Engine` classifications. Registry
+  deterministic capability is conceptual; renderer-owned support separately reports
+  actual Background/Image/Text/Transition support and required-asset readiness.
+  Unsupported exact deterministic content does not become AI merely because a
+  renderer/provider is absent; uncertainty/errors cannot manufacture a resolved choice.
+- Return advisory `provider.RouteResult` and optional `resource.PlanResult` only
+  with matching trusted provider/model/profile/workload facts. Preserve every Phase 07
+  health/ALL-exact-tags/locality/cost/latency/hardware gate and local-only default,
+  plus Phase 08 local_ready/wait/local_ineligible/remote_available distinctions.
+  Missing resource profiles are unknown, not ready; never acquire budget or load models.
+- Check context before/after callbacks/native work, reject late success, ignore
+  error-accompanying payloads, copy metadata/slices, and reject typed-nil required
+  dependencies. Only explicitly transient inspection errors/child timeouts merit
+  retry advice; permanent missing/unauthorized/invalid/limited media/runtime markers
+  override wrapped transient/child-timeout evidence. Nil contexts are invalid requests;
+  parent cancellation is an error, not retry advice. No automatic retry.
+
+**Consequence and evidence boundary:** Validation and selection remain fail-closed,
+measured, and advisory without generation, cache/player work (Phase 10), speech/
+timestamp implementation (Phase 11), real providers (Phases 14/15), installs,
+downloads, or paid/cloud calls. Provider/model tags remain open; no model-name
+branches. Validation API is frozen/scoped-tested; the historical ownership checkpoint
+is superseded by the resume correction below. No active code/test writers.
+Partial as-built checkpoint: `ARCHITECTURE.md`; evidence: `docs/phases/phase-09.md`;
+rollover: `docs/handoffs/next-session-phase-09.md`. The following reviewer-plan state
+is historical checkpoint evidence, superseded by the resume amendment below: Astra
+(`amazon-bedrock/us.openai.gpt-6-astra`) then Terra
+(`amazon-bedrock/openai.gpt-5.6-terra`), sequentially; both NOT STARTED at rollover.
+
+### Amendment (2026-10-11) — checkpoint, not acceptance or phase completion
+
+- Lead-inspected validation/native/render work and fresh scoped uncached tests/race/
+  vet PASS after three red/green refinements: shared domain.Quality alias, nil-context
+  handling, and permanent retry precedence. As-built native stdout/metadata is 64 KiB,
+  stderr is the narrower 8 KiB; 8x8 thumbnail/first-audio 20ms are bounded samples,
+  not whole-stream integrity, semantic QA, hostile-FS race protection, or kernel caps.
+- Intelligence follow-up implemented explicit audio-intent tags, local binding/provenance
+  checks, and core validation-severity scrubbing. Four focused tests and lead scoped
+  unit/race/vet PASS predate acceptance additions; they are not final whole-phase proof.
+- Local resource evidence only: preserve local_ready/wait/local_ineligible when matching
+  trusted facts attest admission. Any/Remote locality remains resource-unknown because
+  RouteResult lacks locality proof; explicit remote routing is still allowed by policy.
+  This conservative limitation is not an implemented remote_available bridge.
+- Five test-only acceptance functions are present. Owner normal/race runs FAIL only
+  `TestAcceptanceCancellationAndOwnership/independent-inputs-and-return-evidence`;
+  lead independently reproduced normal/race FAIL. No race diagnostics, not race PASS.
+- P09-A1 HIGH: `intelligence/intelligence.go:141` decodes snapshot into populated req,
+  reusing caller Project/binding pointers/slices/maps and changing primitive property types.
+  Proposed bounded fix: decode into a fresh zero Request, then replace local req.
+- P09-A2 MEDIUM: `intelligence/helpers.go:216` gives router the retained mutable policy;
+  RequiredTags mutation changes later binding checks/skips planning. Proposed fix:
+   pass `policy.Clone()`. These checkpoint observations are resolved below.
+- Lead acceptance findings are NOT formal Review 1/2. Main-owned record is
+  `docs/reviews/phase-09-acceptance-findings.md`. Lead repository build/vet PASS
+  at checkpoint; full tests/race gate remains pending, not passed. Do not turn
+  earlier scoped/baseline PASS into current full-gate PASS.
+- Owner requests stop/rollover now. Preserve all dirty work, delegate only the two
+  bounded fixes on resume, then full verification → Astra → fixes/retests → Terra →
+  fixes/retests → evidence/docs/final hygiene → one local Phase 09 commit. No push.
+   Phase 10 follows automatically under §0.2 only after Phase 09's full gate/commit.
+
+### Amendment (2026-10-11) — resume corrections and Astra R1 hardening
+
+- P09-A1 now decodes the JSON snapshot into a fresh zero-valued Request before local
+  assignment; P09-A2 passes `policy.Clone()` to the router. The original acceptance
+  ownership assertions remain and pass under normal and race execution.
+- Planner callbacks receive a deep-copied PlanRequest; retained model/profile
+  provenance is compared only with the frozen admitted binding. Router results are
+  copied, restricted to known rejection codes, and required to be structurally
+  coherent before they can become advisory evidence.
+- Frame counts are ceil(duration × round-trippable decimal FPS), not the binary-float
+  expansion. Native child-deadline reporting retains permanent media/limit markers so
+  retry classification remains fail-closed; parent cancellation remains authoritative.
+- Lead independently reran the full uncached repository test/race/vet/build gate
+  after the fixes (PASS). Astra formal R1 approved after reviewing focused regressions.
+  Terra review and Phase 09 closeout remain pending.

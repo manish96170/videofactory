@@ -3300,7 +3300,7 @@ The main session must maintain this section as the authoritative high-level prog
 [x] PHASE 15 — Cloud Providers
 [x] PHASE 16 — End-to-End Autonomous Pipeline
 [x] PHASE 17 — Performance / Reliability / Packaging
-[ ] PHASE 18 — Public Repository / Release Readiness
+[-] PHASE 18 — Public Repository / Release Readiness
 ```
 
 Phase 05 resume (2026-10-09): implementation is present; baseline build,

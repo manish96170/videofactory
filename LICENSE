@@ -1,0 +1,85 @@
+VIDEO FACTORY PERSONAL NON-COMMERCIAL NO-DERIVATIVES LICENSE
+
+Custom proprietary license. This is not an open-source license.
+
+1. Scope and ownership
+
+This license applies to the first-party source code, executable code, and
+documentation in this repository (the "Software"), to the extent the
+copyright holder or other authorized rights holder (the "Licensor") has
+the right to license them. All rights not expressly granted are reserved.
+Ownership of the Software remains with its respective rights holders.
+
+2. Limited grant of license
+
+Subject to compliance with these terms, the Licensor grants you a limited,
+non-exclusive, non-transferable license to download, install, and run the
+Software solely for your own personal, non-commercial purposes. You may
+make copies reasonably necessary for that permitted installation and use,
+including personal backup copies, while retaining this license and notices.
+
+You may compile or package the unmodified source code solely to install
+and run it for the permitted personal, non-commercial use. Such compilation
+or packaging, without changes to the source, is permitted by this license.
+Selecting runtime options, configuring an installation, and providing your
+own input data through the Software's supported interfaces are also permitted.
+
+3. No modification or derivative works
+
+To the maximum extent permitted by applicable law, you may not modify,
+adapt, translate, reverse engineer, decompile, disassemble, or create
+derivative works based upon the Software. These restrictions concern the
+Software itself, not your own input data or generated audio/transcripts.
+Any exception requiring the Licensor's permission must be expressly
+authorized in writing. Restrictions do not override rights that applicable
+law makes non-waivable.
+
+4. No commercial use
+
+You may not sell, rent, lease, or use the Software to provide commercial
+services or for revenue-generating activities. Commercial use includes use
+for the benefit of a business, employer, or paying client, use in a paid
+product or service, and use to create content for monetization. Such use
+requires a separate written license from the Licensor.
+
+No redistribution or sublicensing rights are granted by this license.
+The Licensor may separately authorize distribution or other uses in writing.
+
+5. User content and third-party materials
+
+This license does not transfer ownership of your input data or generated
+output to the Licensor. It does not, however, authorize using the Software
+for a purpose prohibited by Section 4. You remain responsible for obtaining
+rights needed for your input data, voices, and use of generated output.
+
+Third-party libraries, tools, models, voices, operating-system components,
+and other separately licensed materials are governed by their own terms.
+Nothing in this license replaces those terms, removes their required
+notices, or restricts rights independently granted for those materials.
+This license does not grant rights in third-party materials.
+
+6. Disclaimer and limitation of liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE SOFTWARE IS PROVIDED
+"AS IS" AND "AS AVAILABLE", WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE,
+TITLE, AND NON-INFRINGEMENT. THE LICENSOR DOES NOT WARRANT UNINTERRUPTED,
+ERROR-FREE, OR SECURE OPERATION.
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE LICENSOR SHALL NOT
+BE LIABLE FOR DAMAGES ARISING FROM THE SOFTWARE OR ITS USE, INCLUDING
+LOSS OF DATA, PROFITS, OR BUSINESS, WHETHER IN CONTRACT, TORT, OR OTHERWISE.
+NON-WAIVABLE STATUTORY RIGHTS AND LIABILITY ARE NOT EXCLUDED.
+
+7. Termination
+
+If you breach these terms, the permissions granted to you terminate,
+subject to applicable law. You must stop using the Software and remove
+copies you control, except where retention is required or permitted by
+non-waivable law. This requirement does not require deletion of your own
+input/output data or separately licensed third-party materials.
+
+By installing or using the Software under this grant, you agree to these
+terms. If you do not agree, do not install or use it. No modification,
+commercial-use, redistribution, or other additional permission may be
+inferred from public availability of the source or receipt of a copy.

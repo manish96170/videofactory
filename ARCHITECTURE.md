@@ -862,7 +862,8 @@ Evidence: `docs/phases/phase-06.md` and both Phase 06 review records. Terra fina
 scoped normal/race/vet and Luna6 final full uncached build/vet/test/race plus
 staged diff check pass. Final lead post-confirmation gate and hygiene pass.
 The single `phase(06): implement decision engine` commit records completion;
-resolve its hash from repository history. Phase 07 is NOT STARTED.
+resolve its hash from repository history. The following Phase 07 status was historical
+at this checkpoint and is superseded by its completed phase record below.
 
 ## Phase 07 — Provider System / Router
 
@@ -1003,7 +1004,7 @@ from repository history).
 The lead continues automatically to Phase 08 after §14 and that single local
 commit under continuing owner authority; no fresh prompt or automatic push.
 
-## Phase 08 — Model Manager / Resource Planner (as-built draft)
+## Phase 08 — Model Manager / Resource Planner (as-built)
 
 **Phase 08 complete (2026-10-11), recorded by its phase commit.** Started
 2026-10-10 above `dbc5ace`. Resource/domain, worker, and model source is present;
@@ -1170,12 +1171,10 @@ Formal evidence: `docs/reviews/phase-08-review-terra.md`, `docs/reviews/phase-08
 Astra worker audit remains supplementary. Phase evidence/resume: `docs/phases/phase-08.md`,
 `docs/handoffs/next-session-phase-08.md`. Planned commit: `phase(08): implement resource and model management`.
 
-## Phase 09 — Validation / Shot Intelligence (as-built, closeout pending)
+## Historical Phase 09 checkpoint (superseded)
 
-**IN PROGRESS — REVIEW/CLOSEOUT PENDING (2026-10-11).** Above `61e078b`; no Phase 09
-commit. The historical ownership bugs are fixed, the lead full gate passes, and Astra
-approved; Terra evidence confirmation remains. No active code/test writers. This
-section is as-built documentation, not phase completion.
+This checkpoint is historical. Phase 09 completed after its ownership and boundary fixes;
+later phase sections below summarize the implemented architecture.
 
 ### Measured validation API and result boundary
 
@@ -1259,7 +1258,7 @@ section is as-built documentation, not phase completion.
 
 The historical acceptance RED checkpoint is retained in phase evidence. After the
 ownership and Astra R1 boundary fixes, the lead full uncached test/race/vet/build gate
-passes and Astra approved. Terra review and phase closeout remain pending.
+passes and both Astra and Terra approved; Phase 09 is complete in its recorded commit.
 Evidence: `docs/phases/phase-09.md`; resume: `docs/handoffs/next-session-phase-09.md`.
 
 ## Phase 10 — Preview / Checkpoint / Cache / Visual Review
@@ -1285,3 +1284,20 @@ wall-clock duration is persisted; peak memory remains nil when unavailable.
 The implementation supplies a programmatic read model, not a web/TUI player,
 clock, scrubber, ChangeSet path, audio timestamp system, provider execution, or
 background scheduler. Those remain in their respective later phases.
+
+## Phases 11–17 — Later as-built boundaries
+
+`audio` supplies provider-neutral, validated shot-relative audio/word/subtitle timing
+and standard SRT; fixture voice and injected ASR boundaries do not invoke speech
+services. `tui` is a dependency-free, one-shot control-plane model/presentation over
+injected state, events, preview, and review feedback; it is not a playback player.
+`changeset` validates copied, hash-bound chat/feedback proposals and applies a closed
+mutation vocabulary atomically. `localprovider` and `cloudprovider` are injected
+configuration/job boundaries only: neither loads a model nor makes a live cloud call.
+
+`pipeline` connects the deterministic path synchronously through planning, intelligence,
+verified preview artifacts, checkpoints, and controlled FFmpeg composition. Local/cloud
+strategies remain pending approval rather than executing. `observability` provides bounded
+in-process logs/metrics/traces; `cli` provides explicit configuration/help/version and
+snapshot presentation. Phase 17 build guidance uses `-trimpath -buildvcs=false`; cross
+compilation is not a runtime support claim.

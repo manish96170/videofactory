@@ -96,12 +96,18 @@ func parsePS(data []byte, group ProcessGroup) (Sample, error) {
 		}
 		pid, e1 := strconv.ParseInt(fields[0], 10, 64)
 		pgid, e2 := strconv.ParseInt(fields[1], 10, 64)
-		rss, e3 := strconv.ParseInt(fields[2], 10, 64)
-		if e1 != nil || e2 != nil || e3 != nil || pid <= 0 || pgid < 0 || rss < 0 || len(fields[3]) == 0 {
+		if e1 != nil || e2 != nil || pid <= 0 || pgid < 0 {
 			return Sample{}, ErrMonitor
 		}
 		if pgid != int64(group.ID) {
+			// ps is a system-wide snapshot; unrelated processes can have
+			// platform-specific/unknown status and RSS representations. Only
+			// worker-family rows are evidence for this monitor.
 			continue
+		}
+		rss, e3 := strconv.ParseInt(fields[2], 10, 64)
+		if e3 != nil || rss < 0 || len(fields[3]) == 0 {
+			return Sample{}, ErrMonitor
 		}
 		state := fields[3][0]
 		if state == 'Z' || state == 'X' {

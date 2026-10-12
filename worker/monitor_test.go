@@ -10,7 +10,7 @@ import (
 
 func TestNativePSParserLiveFamilyAndZombies(t *testing.T) {
 	group := ProcessGroup{ID: 12345}
-	s, err := parsePS([]byte("10 12345 2 R\n11 12345 3 S+\n12 12345 99 Z\n13 99 100 R\n14 12345 4 T\n"), group)
+	s, err := parsePS([]byte("10 12345 2 R\n11 12345 3 S+\n12 12345 99 Z\n13 99 -1 ?Es\n14 12345 4 T\n"), group)
 	if err != nil || s.Live != 3 || s.Zombies != 1 || s.RSSBytes == nil || *s.RSSBytes != 9*1024 {
 		t.Fatal(s, err)
 	}
@@ -18,7 +18,7 @@ func TestNativePSParserLiveFamilyAndZombies(t *testing.T) {
 	if err != nil || s.RSSBytes != nil || s.Source != "" || s.Live != 0 || s.Zombies != 1 {
 		t.Fatal(s, err)
 	}
-	for _, raw := range []string{"10 12345 -1 R", "10 12345 2 ?", "10 12345 2 R cmd secret", "bad 12345 2 R", fmt.Sprintf("10 12345 %d R", math.MaxInt64), fmt.Sprintf("10 12345 %d R\n11 12345 %d R", math.MaxInt64/1024, math.MaxInt64/1024)} {
+	for _, raw := range []string{"10 12345 -1 R", "10 12345 2 ?", "10 12345 2 ?Es", "10 12345 2 R cmd secret", "bad 12345 2 R", fmt.Sprintf("10 12345 %d R", math.MaxInt64), fmt.Sprintf("10 12345 %d R\n11 12345 %d R", math.MaxInt64/1024, math.MaxInt64/1024)} {
 		if _, err = parsePS([]byte(raw), group); !errors.Is(err, ErrMonitor) {
 			t.Fatal(raw, err)
 		}

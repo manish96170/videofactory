@@ -23,14 +23,15 @@ the authoritative source; this file mirrors them and must stay in sync.
 | 14    | Local AI Providers                           | DONE        |
 | 15    | Cloud Providers                              | DONE        |
 | 16    | End-to-End Autonomous Pipeline               | DONE        |
-| 17    | Performance / Reliability / Packaging        | IN PROGRESS |
-| 18    | Public Repository / Release Readiness        | NOT STARTED |
+| 17    | Performance / Reliability / Packaging        | DONE        |
+| 18    | Public Repository / Release Readiness        | DONE        |
 
 ## First milestones (PHASES.md section 29)
 
-Phases 09 and 10 are complete locally with their required reviews and full gates.
-Phase 10 provides a programmatic preview/cache/checkpoint/review boundary; its player
-and scrubber UI remain intentionally deferred to Phase 12. No phase has been pushed.
+Phases 09–17 are complete with their required reviews and full gates. Phase 10 provides
+a programmatic preview/cache/checkpoint/review boundary; Phase 12 consumes it through a
+one-shot control-plane presentation, not a playback player or scrubber. Phase 18 is
+reconciling public release readiness; rewritten history has been force-pushed.
 
 1. Manual `VideoPlan` → 3 deterministic shots → deterministic renderer → MP4.
 2. Prompt → Director → `VideoPlan` → deterministic renderer → MP4.

@@ -42,7 +42,7 @@ type ffprobeOutput struct {
 // and frame rate from its first video stream (PHASES.md Phase 03
 // "FFprobe validation").
 func Probe(ctx context.Context, path string) (ProbeResult, error) {
-	out, err := runCommand(ctx, ffprobeBinary, "-v", "error", "-print_format", "json", "-show_format", "-show_streams", path)
+	out, err := runCommandOutput(ctx, ffprobeBinary, maxCapturedProbeStdout, "-v", "error", "-print_format", "json", "-show_format", "-show_streams", path)
 	if err != nil {
 		return ProbeResult{}, err
 	}
@@ -159,11 +159,15 @@ func (c RGB) CloseTo(want RGB, tolerance int) bool {
 // a short clip. Accuracy matters more than speed for these short test
 // fixtures.
 func SamplePixel(ctx context.Context, path string, at time.Duration, x, y, width, height int) (RGB, error) {
+	want, err := rawVideoOutputSize(width, height)
+	if err != nil {
+		return RGB{}, err
+	}
 	if x < 0 || x >= width || y < 0 || y >= height {
 		return RGB{}, fmt.Errorf("render: pixel (%d,%d) out of bounds for a %dx%d frame", x, y, width, height)
 	}
 
-	out, err := runCommand(ctx, ffmpegBinary,
+	out, err := runCommandOutput(ctx, ffmpegBinary, want,
 		"-i", path,
 		"-ss", formatSeconds(at.Seconds()),
 		"-frames:v", "1",
@@ -176,11 +180,27 @@ func SamplePixel(ctx context.Context, path string, at time.Duration, x, y, width
 		return RGB{}, err
 	}
 
-	want := width * height * 3
 	if len(out) < want {
 		return RGB{}, fmt.Errorf("render: expected %d bytes of rawvideo output from %s at %v, got %d", want, path, at, len(out))
 	}
 
 	idx := (y*width + x) * 3
 	return RGB{R: out[idx], G: out[idx+1], B: out[idx+2]}, nil
+}
+
+const maxCapturedPixelOutput = 64 << 20
+
+func rawVideoOutputSize(width, height int) (int, error) {
+	if width <= 0 || height <= 0 {
+		return 0, fmt.Errorf("render: frame dimensions must be positive, got %dx%d", width, height)
+	}
+	maxInt := int(^uint(0) >> 1)
+	if width > maxInt/3/height {
+		return 0, fmt.Errorf("render: frame dimensions %dx%d overflow rawvideo size", width, height)
+	}
+	want := width * height * 3
+	if want > maxCapturedPixelOutput {
+		return 0, fmt.Errorf("render: frame dimensions %dx%d exceed the %d-byte rawvideo capture limit", width, height, maxCapturedPixelOutput)
+	}
+	return want, nil
 }

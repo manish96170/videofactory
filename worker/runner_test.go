@@ -870,6 +870,7 @@ func verifyDescendantStopped(ctx context.Context, output []byte, queryErr error,
 		return ErrMonitor
 	}
 	seen := make(map[int]struct{})
+	rows := 0
 	stopped := true
 	for _, line := range bytes.Split(output, []byte{'\n'}) {
 		fields := strings.Fields(string(line))
@@ -880,18 +881,28 @@ func verifyDescendantStopped(ctx context.Context, output []byte, queryErr error,
 			return ErrMonitor
 		}
 		id, err := strconv.Atoi(fields[0])
-		if err != nil || id <= 0 || len(fields[1]) == 0 || !strings.ContainsRune("RSDTIWUPEZX", rune(fields[1][0])) {
+		if err != nil || id <= 0 {
 			return ErrMonitor
+		}
+		rows++
+		// The whole-list query must be structurally usable, but status is
+		// relevant only for the descendant PID; unrelated platform statuses
+		// must not invalidate otherwise-positive absence evidence.
+		if id != pid {
+			continue
 		}
 		if _, duplicate := seen[id]; duplicate {
 			return ErrMonitor
 		}
 		seen[id] = struct{}{}
-		if id == pid && fields[1][0] != 'Z' && fields[1][0] != 'X' {
+		if len(fields[1]) == 0 || !strings.ContainsRune("RSDTIWUPEZX", rune(fields[1][0])) {
+			return ErrMonitor
+		}
+		if fields[1][0] != 'Z' && fields[1][0] != 'X' {
 			stopped = false
 		}
 	}
-	if len(seen) == 0 {
+	if rows == 0 {
 		return ErrMonitor
 	}
 	if !stopped {
@@ -927,8 +938,8 @@ func TestDescendantProofSuccessfulWholeList(t *testing.T) {
 		output string
 		want   error
 	}{
-		{"9 S\n", nil}, {"9 S\n42 Z\n", nil}, {"42 X\n", nil}, {"42 T\n", ErrCleanup},
-		{"42 R\n", ErrCleanup}, {"42 ?\n", ErrMonitor}, {"42 Z\n42 R\n", ErrMonitor}, {"\n", ErrMonitor}, {"not-pid S\n", ErrMonitor},
+		{"9 S\n", nil}, {"9 ?Es\n42 Z\n", nil}, {"9 S\n42 Z\n", nil}, {"42 X\n", nil}, {"42 T\n", ErrCleanup},
+		{"42 R\n", ErrCleanup}, {"42 ?\n", ErrMonitor}, {"42 ?Es\n", ErrMonitor}, {"42 Z\n42 R\n", ErrMonitor}, {"\n", ErrMonitor}, {"not-pid S\n", ErrMonitor},
 	} {
 		if err := verifyDescendantStopped(context.Background(), []byte(tc.output), nil, 42); !errors.Is(err, tc.want) {
 			t.Fatal("incorrect PID proof outcome", err, tc.want)

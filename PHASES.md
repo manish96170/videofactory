@@ -37,6 +37,10 @@ github.com/manish96170
 
 The intended repository is a **public repository**.
 
+The owner explicitly approved `Manish Sharma <manish9617026809@gmail.com>` as this
+repository's public Git author/committer identity on 2026-10-12. This is the narrow
+exception to the generic public-hygiene rule for commit metadata.
+
 Do not expose secrets, API keys, credentials, personal tokens, local absolute paths, or private infrastructure configuration.
 
 ## 0.2 Continuing orchestration authority (2026-10-09)
@@ -2598,37 +2602,37 @@ github.com/manish96170/<repo>
 
 ## TODO
 
-- [ ] final architecture review
-- [ ] security review
-- [ ] dependency review
-- [ ] license review
-- [ ] README
-- [ ] installation
-- [ ] quickstart
-- [ ] architecture diagram
-- [ ] provider documentation
-- [ ] local hardware limitations
-- [ ] configuration docs
-- [ ] development docs
-- [ ] contributing guide
-- [ ] issue templates if useful
-- [ ] examples
-- [ ] sample project
-- [ ] sample provider
-- [ ] sample deterministic render
-- [ ] remove secrets
-- [ ] remove private data
-- [ ] remove large artifacts
-- [ ] check git history
-- [ ] build matrix
-- [ ] final test suite
-- [ ] final review #1
-- [ ] fix
-- [ ] final review #2
-- [ ] fix
-- [ ] final security review
-- [ ] final docs
-- [ ] release commit
+- [x] final architecture review
+- [x] security review
+- [x] dependency review
+- [x] license review
+- [x] README
+- [x] installation
+- [x] quickstart
+- [x] architecture diagram (textual architecture in README/ARCHITECTURE)
+- [x] provider documentation
+- [x] local hardware limitations
+- [x] configuration docs
+- [x] development docs
+- [x] contributing guide
+- [x] issue templates if useful (SECURITY policy provided; no issue template needed)
+- [x] examples
+- [x] sample project
+- [x] sample provider
+- [x] sample deterministic render
+- [x] remove secrets
+- [x] remove private data
+- [x] remove large artifacts
+- [x] check git history
+- [x] build matrix
+- [x] final test suite
+- [x] final review #1 (astra high approved after fixes)
+- [x] fix
+- [x] final review #2 (terra high approved after fixes)
+- [x] fix
+- [x] final security review
+- [x] final docs
+- [x] release commit (`phase(18): prepare public release readiness`)
 
 Do not publish until repository hygiene is confirmed.
 
@@ -3300,7 +3304,7 @@ The main session must maintain this section as the authoritative high-level prog
 [x] PHASE 15 — Cloud Providers
 [x] PHASE 16 — End-to-End Autonomous Pipeline
 [x] PHASE 17 — Performance / Reliability / Packaging
-[-] PHASE 18 — Public Repository / Release Readiness
+[x] PHASE 18 — Public Repository / Release Readiness
 ```
 
 Phase 05 resume (2026-10-09): implementation is present; baseline build,

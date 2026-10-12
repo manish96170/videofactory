@@ -18,3 +18,9 @@ This is not legal advice. Before a public binary/package release, obtain qualifi
 counsel review of the terms, rights-holder authority, jurisdiction-specific wording,
 and third-party obligations. Creating this license does not itself authorize release,
 publication, signing, model downloads, or paid provider use.
+
+## Contact policy
+
+The owner explicitly elected to retain generic Licensor wording and provide no public
+commercial or contribution-authorization contact. No implied contact channel or
+commercial license route is currently offered.

@@ -2526,38 +2526,57 @@ A real user prompt should be capable of producing a valid video artifact through
 
 Make the system reliable enough for serious use.
 
+## Lead decisions under delegated routine-policy authority (2026-10-12)
+
+- Establish reproducible Go benchmark/stress baselines before changing hot paths.
+  Report deterministic fixture timing/allocation results only; no model/provider
+  benchmark is fabricated or requires loading models.
+- Add a small dependency-free `observability/` package for bounded structured logs,
+  in-process metrics, and trace correlation records. It is an injected sink/source,
+  not Datadog/cloud telemetry, a durable log, or a secret-bearing request recorder.
+- Improve the CLI only as a stable stdlib command shell exposing version/help, config
+  validation, and TUI snapshot presentation. No daemon, interactive raw terminal loop,
+  credentials, automatic generation, or hidden configuration discovery.
+- Packaging consists of reproducible build metadata, documented macOS/Linux cross-build
+  commands, and checked version injection. No binaries, release archive, installer, or
+  publication is created in the repository.
+- Reliability work must be test/measurement-led: bounded stress/race tests, large
+  deterministic project coverage, cancellation/partial recovery invariants, and cache
+  effectiveness counters. Resource scheduler policy is observed but not retuned without
+  an evidenced bottleneck. Reviews: astra then terra.
+
 ## TODO
 
-- [ ] profiling
-- [ ] memory profiling
-- [ ] CPU profiling
-- [ ] concurrency profiling
-- [ ] resource scheduler tuning
-- [ ] startup optimization
-- [ ] provider startup timing
-- [ ] model load timing
-- [ ] cache effectiveness
-- [ ] failure recovery
-- [ ] structured logs
-- [ ] metrics
-- [ ] tracing strategy
-- [ ] deterministic test suite
-- [ ] race tests
-- [ ] stress tests
-- [ ] large project test
-- [ ] packaging
-- [ ] macOS binary
-- [ ] Linux binary
-- [ ] configuration
-- [ ] CLI
-- [ ] TUI startup
-- [ ] Agent review #1
-- [ ] Fix
-- [ ] Agent review #2
-- [ ] Fix
-- [ ] Evidence
-- [ ] Docs
-- [ ] Commit
+- [x] profiling
+- [x] memory profiling
+- [x] CPU profiling
+- [x] concurrency profiling
+- [x] resource scheduler tuning (retained after evidence)
+- [x] startup optimization (no unsupported optimization claimed)
+- [!] provider startup timing (unavailable without provider runtime)
+- [!] model load timing (unavailable without model load)
+- [x] cache effectiveness
+- [x] failure recovery
+- [x] structured logs
+- [x] metrics
+- [x] tracing strategy
+- [x] deterministic test suite
+- [x] race tests
+- [x] stress tests
+- [x] large project test
+- [x] packaging
+- [x] macOS binary (cross-build verified)
+- [x] Linux binary (cross-build verified)
+- [x] configuration
+- [x] CLI
+- [x] TUI startup (one-shot snapshot presentation)
+- [x] Agent review #1 (astra high approved after evidence fixes)
+- [x] Fix
+- [x] Agent review #2 (terra high approved after portability fixes)
+- [x] Fix
+- [x] Evidence
+- [x] Docs
+- [x] Commit (`phase(17): add reliability and packaging`)
 
 Do not optimize based on intuition alone.
 
@@ -3280,7 +3299,7 @@ The main session must maintain this section as the authoritative high-level prog
 [x] PHASE 14 — Local AI Providers
 [x] PHASE 15 — Cloud Providers
 [x] PHASE 16 — End-to-End Autonomous Pipeline
-[ ] PHASE 17 — Performance / Reliability / Packaging
+[x] PHASE 17 — Performance / Reliability / Packaging
 [ ] PHASE 18 — Public Repository / Release Readiness
 ```
 

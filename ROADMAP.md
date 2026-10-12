@@ -22,8 +22,8 @@ the authoritative source; this file mirrors them and must stay in sync.
 | 13    | Director Chat / ChangeSets / Visual Editing  | DONE        |
 | 14    | Local AI Providers                           | DONE        |
 | 15    | Cloud Providers                              | DONE        |
-| 16    | End-to-End Autonomous Pipeline               | NOT STARTED |
-| 17    | Performance / Reliability / Packaging        | NOT STARTED |
+| 16    | End-to-End Autonomous Pipeline               | DONE        |
+| 17    | Performance / Reliability / Packaging        | IN PROGRESS |
 | 18    | Public Repository / Release Readiness        | NOT STARTED |
 
 ## First milestones (PHASES.md section 29)

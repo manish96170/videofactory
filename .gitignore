@@ -6,6 +6,7 @@
 *.out
 coverage.out
 coverage.html
+*.pprof
 
 # OS
 .DS_Store

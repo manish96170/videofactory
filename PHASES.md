@@ -1942,42 +1942,70 @@ Terra formal reviews and the full Phase 09 completion gate remain pending.
 
 Make iteration cheap and incremental.
 
+## Lead decisions under delegated routine-policy authority (2026-10-11)
+
+- Keep `domain.RenderManifest` renderer-only and reuse existing domain Project,
+  Quality, GenerationResult, ValidationResult, ReviewFeedback, dependency, and
+  timeline contracts. New artifact/checkpoint/review/preview behavior belongs in
+  small packages, not the renderer, project aggregate, or a new UI.
+- Cache keys are SHA-256 hashes of a typed canonical projection, never raw map
+  iteration/JSON bytes. Include only pixel-affecting explicit facts (shot/render
+  configuration, quality, source-content digests, direct dependency artifact
+  digests, and applicable seed/provider/model/profile revisions). Exclude output
+  paths, IDs, clock values, measurements, feedback, and events.
+- Cache hits require a completed, integrity-verified artifact/manifest within a
+  controlled root; partial, corrupt, wrong-identity, or missing entries are safe
+  misses. Publication later uses owned staging plus atomic rename; never persist
+  contexts, leases, live workers, raw errors, prompts, credentials, or absolute
+  paths. Resume schedules unfinished work; it does not resume a process.
+- Reuse `project.DependencyGraph.AffectedBy` for downstream invalidation and add
+  changed roots explicitly. A cache key independently incorporates direct
+  dependency artifact identity so missed event delivery cannot reuse stale output.
+- Phase 10 exposes a programmatic preview read model and persists validated
+  `ReviewFeedback`; it does not implement a web/TUI player, playback clock,
+  scrubber UI, ChangeSet translation/application, or Phase 11 audio timestamps.
+  Both future clients consume this shared data boundary.
+- Implement in bounded tranches after each API freezes: pure artifact key/
+  invalidation; controlled artifact/checkpoint storage; feedback/preview read
+  model; then a small synchronous coordinator. No generation, paid calls, model
+  loading, or background scheduler. Planned reviewers: luna then luna6.
+
 ## TODO
 
-- [ ] preview mode
-- [ ] draft quality
-- [ ] final quality
-- [ ] preview output
-- [ ] shot cache
-- [ ] input hashing
-- [ ] dependency hashing
-- [ ] cache hit/miss
-- [ ] checkpointing
-- [ ] resume
-- [ ] invalidation
-- [ ] downstream invalidation
-- [ ] sidecar metadata
-- [ ] reproducibility metadata
-- [ ] generation seed
-- [ ] provider/model/version metadata
-- [ ] timing
-- [ ] peak memory
-- [ ] validation result
-- [ ] source assets
-- [ ] local preview player
-- [ ] timeline scrubber / current timestamp
-- [ ] visual element selection
-- [ ] timestamped review feedback
-- [ ] review feedback persistence
-- [ ] preview reload after rebuild
-- [ ] tests
-- [ ] Agent review #1
-- [ ] Fix
-- [ ] Agent review #2
-- [ ] Fix
-- [ ] Evidence
-- [ ] Docs
-- [ ] Commit
+- [x] preview mode (programmatic preview coordinator/read model)
+- [x] draft quality (explicit domain quality in key, cache, checkpoint, and coordinator)
+- [x] final quality (explicit domain quality in key, cache, checkpoint, and coordinator)
+- [x] preview output (verified root-relative media and manifest view)
+- [x] shot cache (integrity-checked immutable artifact store)
+- [x] input hashing (canonical typed SHA-256 projection; scoped tests/race/vet pass)
+- [x] dependency hashing (direct published-artifact digest roles; scoped tests/race/vet pass)
+- [x] cache hit/miss (coordinator verifies and bypasses rendering on accepted hits)
+- [x] checkpointing (versioned atomic checkpoint store)
+- [x] resume (artifact-revalidating pending/ready classification, no process restore)
+- [x] invalidation (changed roots; scoped tests/race/vet pass)
+- [x] downstream invalidation (reuses validated dependency graph closure; scoped tests/race/vet pass)
+- [x] sidecar metadata (checksummed artifact and manifest sidecars)
+- [x] reproducibility metadata (key-bound provenance and artifact digests)
+- [x] generation seed (optional explicit key/provenance input)
+- [x] provider/model/version metadata (optional explicit revision provenance)
+- [x] timing (measured coordinator render duration)
+- [x] peak memory (explicit nil unknown; never fabricated)
+- [x] validation result (accepted persisted validation is required for preview)
+- [x] source assets (explicit digest-role provenance)
+- [!] local preview player (deferred to Phase 12 UI; Phase 10 supplies shared read model only)
+- [!] timeline scrubber / current timestamp (deferred to Phase 12 UI; `View.AtShot`/`AtProject` are available)
+- [x] visual element selection (stable element/timestamp read-model queries)
+- [x] timestamped review feedback (existing ReviewFeedback validated against authoritative timeline)
+- [x] review feedback persistence (bounded append-only store)
+- [x] preview reload after rebuild (deterministic view revision token)
+- [x] tests (full uncached test/race/vet/build gate passes)
+- [x] Agent review #1 (luna — approved after manifest-identity fix; see `docs/reviews/phase-10-review-luna.md`)
+- [x] Fix (identity-only manifest rebinding; non-ID changes require rerender)
+- [x] Agent review #2 (luna6 — approved after validation/measurement fixes; see `docs/reviews/phase-10-review-luna6.md`)
+- [x] Fix (accepted validation required; render duration recorded; peak unknown preserved)
+- [x] Evidence (both formal records written)
+- [x] Docs (architecture, ADR, roadmap, phase evidence, and handoff reconciled)
+- [x] Commit (`phase(10): implement preview checkpoint and cache`)
 
 ## Target asset layout
 
@@ -3123,7 +3151,7 @@ The main session must maintain this section as the authoritative high-level prog
 [x] PHASE 07 — Provider System / Router
 [x] PHASE 08 — Model Manager / Resource Planner
 [x] PHASE 09 — Validation / Shot Intelligence
-[ ] PHASE 10 — Preview / Checkpoint / Cache / Visual Review
+[x] PHASE 10 — Preview / Checkpoint / Cache / Visual Review
 [ ] PHASE 11 — Audio / Timestamp / Temporal Intelligence
 [ ] PHASE 12 — TUI Control Plane / Visual Review
 [ ] PHASE 13 — Director Chat / ChangeSets / Visual Editing
@@ -3295,6 +3323,18 @@ no active writers. Phase 09 full test/race gate has not passed. Formal Astra →
 reviews have NOT STARTED. Owner requested context rollover at about 88%; docs and
 `docs/handoffs/next-session-phase-09.md` checkpoint preserve exact continuation.
 Phase 09 remains IN PROGRESS; no commit/push and no later-phase implementation.
+
+Phase 09 completion (2026-10-11): the bounded Luna implementation corrected the
+acceptance-found P09-A1 request snapshot and P09-A2 router-policy aliasing defects,
+with the original regression retained RED→GREEN. Astra R1 found four in-scope MEDIUM
+boundary issues (planner callback isolation, native permanent-error precedence,
+decimal FPS frame rounding, and router-result sanitization); each was corrected with
+focused regressions and Astra approved. Terra R2 found no production/test defect and
+approved after formal-evidence and historical-checkpoint reconciliation. The final
+lead uncached `go test ./...`, `go test -race ./...`, `go vet ./...`, and `go build ./...`
+gate passed; formatting, staged diff, and hygiene checks passed. Completion is the
+single local `4326f6c` commit, `phase(09): implement validation and shot intelligence`.
+No push. Phase 10 begins under §0.2 in a planning-only checkpoint.
 
 ---
 

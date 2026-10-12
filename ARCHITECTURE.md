@@ -1261,3 +1261,27 @@ The historical acceptance RED checkpoint is retained in phase evidence. After th
 ownership and Astra R1 boundary fixes, the lead full uncached test/race/vet/build gate
 passes and Astra approved. Terra review and phase closeout remain pending.
 Evidence: `docs/phases/phase-09.md`; resume: `docs/handoffs/next-session-phase-09.md`.
+
+## Phase 10 — Preview / Checkpoint / Cache / Visual Review
+
+Phase 10 adds four small packages without changing the authoritative project or
+renderer contracts. `artifact` builds canonical typed SHA-256 keys, computes
+root-plus-downstream invalidation, and owns controlled-root immutable artifact
+publication with checksum-verified lookup. Artifact media is reusable only with
+accepted persisted validation evidence.
+
+`checkpoint` persists versioned, checksummed progress snapshots and revalidates
+all claimed completed artifacts on resume; it never restores processes, resource
+leases, worker state, or callbacks. `review` validates and atomically persists
+append-only `domain.ReviewFeedback` against the supplied authoritative project
+and timeline. `preview` exposes detached verified artifacts, stable element and
+timestamp resolution, and a synchronous cache-hit/miss coordinator.
+
+Pixel cache keys intentionally omit VisualElement IDs. Immutable metadata bindings
+permit reuse only when elements differ solely by stable IDs; changes to timing,
+bounds, type, editable properties, or multiplicity require rerendering. Render
+wall-clock duration is persisted; peak memory remains nil when unavailable.
+
+The implementation supplies a programmatic read model, not a web/TUI player,
+clock, scrubber, ChangeSet path, audio timestamp system, provider execution, or
+background scheduler. Those remain in their respective later phases.

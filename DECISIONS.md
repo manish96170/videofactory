@@ -1254,4 +1254,24 @@ is historical checkpoint evidence, superseded by the resume amendment below: Ast
   retry classification remains fail-closed; parent cancellation remains authoritative.
 - Lead independently reran the full uncached repository test/race/vet/build gate
   after the fixes (PASS). Astra formal R1 approved after reviewing focused regressions.
-  Terra review and Phase 09 closeout remain pending.
+   Terra approved and Phase 09 completed in local commit `4326f6c`.
+
+---
+
+## ADR-023: Phase 10 verified artifact cache and programmatic preview boundary
+
+**Date:** 2026-10-12
+**Status:** Accepted and implemented; Phase 10 closeout recorded in its local commit.
+
+- Artifact keys are canonical typed SHA-256 projections of explicit pixel-affecting
+  inputs. Immutable artifact entries are integrity-checked and published atomically.
+- Visual element IDs are metadata identity, not pixel identity. A separate immutable
+  binding may reuse verified media only for ID-only element changes; bounds, timing,
+  type, editable properties, or element multiplicity require rerendering.
+- A preview is available only when its immutable artifact has accepted persisted media
+  validation. Coordinator render duration is measured; peak memory is nil when unknown.
+- Checkpoint resume revalidates every published artifact and schedules nonverified work;
+  it never resumes processes, contexts, leases, workers, or providers.
+- Feedback persistence and preview addressing use existing project/timeline authority.
+  No UI/player, ChangeSet mutation, audio timestamps, provider execution, or scheduler
+  is introduced. Those ideas remain deferred to their owning phases.

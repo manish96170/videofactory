@@ -29,11 +29,13 @@ type GenerationRequest struct {
 // the metadata needed for caching/incremental rebuild (section 4.6) and
 // reproducibility (section 10 / Phase 10 cache sidecar metadata).
 type GenerationResult struct {
-	ID           ID             `json:"id"`
-	RequestID    ID             `json:"requestId"`
-	AssetID      ID             `json:"assetId,omitempty"`
-	Seed         string         `json:"seed,omitempty"`
-	DurationMs   int64          `json:"durationMs,omitempty"`
-	PeakMemoryMB float64        `json:"peakMemoryMb,omitempty"`
+	ID         ID     `json:"id"`
+	RequestID  ID     `json:"requestId"`
+	AssetID    ID     `json:"assetId,omitempty"`
+	Seed       string `json:"seed,omitempty"`
+	DurationMs int64  `json:"durationMs,omitempty"`
+	// PeakMemoryMB is a measured peak in MB. Nil means no measurement is
+	// available; a non-nil zero represents an explicitly measured zero.
+	PeakMemoryMB *float64       `json:"peakMemoryMb,omitempty"`
 	Metadata     map[string]any `json:"metadata,omitempty"`
 }

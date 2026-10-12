@@ -91,18 +91,19 @@ func TestGenerationRequestAndResultJSONRoundTrip(t *testing.T) {
 		t.Fatalf("generation request round trip mismatch: %+v", decodedReq)
 	}
 
+	peak := 5120.5
 	result := GenerationResult{
 		ID:           ID("gen-res-1"),
 		RequestID:    ID("gen-req-1"),
 		AssetID:      ID("asset-1"),
 		Seed:         "12345",
 		DurationMs:   4200,
-		PeakMemoryMB: 5120.5,
+		PeakMemoryMB: &peak,
 	}
 	decodedResult := jsonRoundTrip(t, result)
 	if decodedResult.ID != result.ID || decodedResult.RequestID != result.RequestID ||
 		decodedResult.AssetID != result.AssetID || decodedResult.Seed != result.Seed ||
-		decodedResult.DurationMs != result.DurationMs || decodedResult.PeakMemoryMB != result.PeakMemoryMB {
+		decodedResult.DurationMs != result.DurationMs || decodedResult.PeakMemoryMB == nil || *decodedResult.PeakMemoryMB != *result.PeakMemoryMB {
 		t.Fatalf("generation result round trip mismatch: got %+v, want %+v", decodedResult, result)
 	}
 }

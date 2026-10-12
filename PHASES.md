@@ -2161,6 +2161,26 @@ It should consume state/events instead of owning renderer/provider logic.
 
 Allow natural-language editing of a video project.
 
+## Lead decisions under delegated routine-policy authority (2026-10-12)
+
+- Reuse `domain.ChangeSet`/`Change` but define closed deterministic mutation
+  vocabulary and validation in a new `changeset/` package. Chat/feedback adapters
+  produce proposals through an injected context-aware IntentProvider; no model,
+  vendor, network, or prompt interpreter implementation is added.
+- ChangeSets are optimistic proposals bound to a canonical project hash. Apply only
+  explicit supported mutations against copied authoritative project state; reject
+  stale/cancelled/invalid proposals atomically. Review mode defaults on; automatic
+  mode means apply a previously validated proposal, never auto-accept provider prose.
+- ReviewFeedback is converted through the same intent/proposal path with its stable
+  project/shot/element/timestamp context. No separate visual mutation system.
+- Affected-shot calculation reuses Phase 10 root-plus-downstream invalidation. Cache
+  invalidation is advisory output only; no rendering/cache deletion/provider/resource
+  execution is authorized. Audit records bounded core codes and IDs, not prompts/raw
+  errors/payloads.
+- Reviews: luna then luna6. Phase 14 starts only after the Phase 13 full gate and one
+  local commit; real local provider execution/install/model download remains out of
+  scope without separate authorization.
+
 Pipeline:
 
 ```text
@@ -2175,29 +2195,29 @@ User
 
 ## TODO
 
-- [ ] chat request model
-- [ ] intent model
-- [ ] ChangeSet model
-- [ ] visual review feedback input
-- [ ] element/timestamp-aware intent
-- [ ] preview changes
-- [ ] Apply
-- [ ] Cancel
-- [ ] validation
-- [ ] affected-shot calculation
-- [ ] cache invalidation
-- [ ] resource impact calculation
-- [ ] review mode
-- [ ] automatic mode
-- [ ] audit trail
-- [ ] tests
-- [ ] Agent review #1
-- [ ] Fix
-- [ ] Agent review #2
-- [ ] Fix
-- [ ] Evidence
-- [ ] Docs
-- [ ] Commit
+- [x] chat request model
+- [x] intent model
+- [x] ChangeSet model
+- [x] visual review feedback input
+- [x] element/timestamp-aware intent
+- [x] preview changes (advisory invalidation output)
+- [x] Apply
+- [x] Cancel
+- [x] validation
+- [x] affected-shot calculation
+- [x] cache invalidation (advisory only)
+- [x] resource impact calculation (explicit unknown)
+- [x] review mode
+- [x] automatic mode (validated proposals only)
+- [x] audit trail
+- [x] tests
+- [x] Agent review #1 (luna approved after fixes)
+- [x] Fix
+- [x] Agent review #2 (luna6 approved)
+- [x] Fix
+- [x] Evidence
+- [x] Docs
+- [x] Commit (`phase(13): implement director chat and changesets`)
 
 ## Visual editing loop
 
@@ -3197,7 +3217,7 @@ The main session must maintain this section as the authoritative high-level prog
 [x] PHASE 10 — Preview / Checkpoint / Cache / Visual Review
 [x] PHASE 11 — Audio / Timestamp / Temporal Intelligence
 [x] PHASE 12 — TUI Control Plane / Visual Review
-[ ] PHASE 13 — Director Chat / ChangeSets / Visual Editing
+[x] PHASE 13 — Director Chat / ChangeSets / Visual Editing
 [ ] PHASE 14 — Local AI Providers
 [ ] PHASE 15 — Cloud Providers
 [ ] PHASE 16 — End-to-End Autonomous Pipeline

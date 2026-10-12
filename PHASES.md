@@ -2022,6 +2022,30 @@ shot-017.json
 
 Treat audio as a first-class timeline input.
 
+## Lead decisions under delegated routine-policy authority (2026-10-12)
+
+- Add provider-neutral audio/timestamp behavior in a new `audio/` package and only
+  the minimal pure domain contracts needed for serializable audio assets, word
+  timings, and subtitle cues. Do not add real cloud/local inference, downloads, or
+  platform speech frameworks.
+- Normalize all temporal intervals to nonnegative, end-exclusive `time.Duration`
+  values; reject overlaps, blank words, invalid linkage, and out-of-media ranges.
+  Preserve existing shot-relative/project-relative conventions rather than creating
+  a parallel timestamp coordinate system.
+- SRT is a strict, bounded import/export codec over validated subtitle cues. It is
+  not an HTML/player renderer or a replacement for future Phase 12 controls.
+- Voice and ASR use small context-aware interfaces. A deterministic fixture voice
+  provider and local-ASR worker adapter boundary may produce serializable results,
+  but no native speech engine is invoked. Trusted runtime worker configuration owns
+  executable/argv/environment, not caller-provided generation parameters.
+- Audio/video sync is deterministic interval validation/advice against explicit
+  expected durations only; it does not alter video, stretch audio, animate mouths,
+  or schedule work. Apple TTS remains an explicit unsupported integration seam.
+- Copy all maps/slices on ingress/egress; results accompanying dependency errors or
+  late callback completion are ignored. No background retries/goroutines, provider
+  selection, resource acquisition, or cache/player redesign. Reviews: luna6 then
+  astra, distinct from implementation.
+
 Pipeline:
 
 ```text
@@ -2036,29 +2060,29 @@ script
 
 ## TODO
 
-- [ ] AudioAsset
-- [ ] VoiceProvider interface
-- [ ] ASR interface
-- [ ] word timestamp representation
-- [ ] SRT support
-- [ ] subtitle timing
-- [ ] voice timing
-- [ ] audio duration validation
-- [ ] audio/video sync
-- [ ] timestamp normalization
-- [ ] timestamp-to-element/event mapping contract
-- [ ] deterministic mock TTS
-- [ ] external worker interface
-- [ ] local ASR provider interface
-- [ ] Apple TTS integration boundary
-- [ ] tests
-- [ ] Agent review #1
-- [ ] Fix
-- [ ] Agent review #2
-- [ ] Fix
-- [ ] Evidence
-- [ ] Docs
-- [ ] Commit
+- [x] AudioAsset
+- [x] VoiceProvider interface
+- [x] ASR interface
+- [x] word timestamp representation
+- [x] SRT support
+- [x] subtitle timing
+- [x] voice timing
+- [x] audio duration validation
+- [x] audio/video sync
+- [x] timestamp normalization
+- [x] timestamp-to-element/event mapping contract
+- [x] deterministic mock TTS
+- [x] external worker interface
+- [x] local ASR provider interface
+- [x] Apple TTS integration boundary (explicit unsupported seam)
+- [x] tests (final full uncached gate passes)
+- [x] Agent review #1 (luna6 — approved after fixes)
+- [x] Fix (metadata safety, strict SRT, and cancellation regressions)
+- [x] Agent review #2 (astra — approved after fixes)
+- [x] Fix (Astra findings resolved; JSON round-trip coverage added)
+- [x] Evidence
+- [x] Docs
+- [x] Commit (`phase(11): implement audio and timestamp pipeline`)
 
 ---
 
@@ -3152,7 +3176,7 @@ The main session must maintain this section as the authoritative high-level prog
 [x] PHASE 08 — Model Manager / Resource Planner
 [x] PHASE 09 — Validation / Shot Intelligence
 [x] PHASE 10 — Preview / Checkpoint / Cache / Visual Review
-[ ] PHASE 11 — Audio / Timestamp / Temporal Intelligence
+[x] PHASE 11 — Audio / Timestamp / Temporal Intelligence
 [ ] PHASE 12 — TUI Control Plane / Visual Review
 [ ] PHASE 13 — Director Chat / ChangeSets / Visual Editing
 [ ] PHASE 14 — Local AI Providers

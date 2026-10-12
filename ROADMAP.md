@@ -21,7 +21,7 @@ the authoritative source; this file mirrors them and must stay in sync.
 | 12    | TUI Control Plane / Visual Review            | DONE        |
 | 13    | Director Chat / ChangeSets / Visual Editing  | DONE        |
 | 14    | Local AI Providers                           | DONE        |
-| 15    | Cloud Providers                              | NOT STARTED |
+| 15    | Cloud Providers                              | DONE        |
 | 16    | End-to-End Autonomous Pipeline               | NOT STARTED |
 | 17    | Performance / Reliability / Packaging        | NOT STARTED |
 | 18    | Public Repository / Release Readiness        | NOT STARTED |

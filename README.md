@@ -13,7 +13,7 @@ Prompt → Director → VideoPlan → Shot Planner → Shot Intelligence
 
 ## Status
 
-Completed through Phase 14. Phase 14 adds safe local adapter boundaries only; no real
+Completed through Phase 15. Phase 14 adds safe local adapter boundaries only; no real
 model runtime has been installed or invoked. Phase 10
 adds verified artifact caching, resumable checkpoints, review-feedback persistence,
 and a programmatic preview read model; it does not yet provide the Phase 12 player or

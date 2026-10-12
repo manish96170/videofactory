@@ -2389,6 +2389,25 @@ Provider capability declarations must include hardware requirements.
 
 Add cloud generation behind the same provider contracts.
 
+## Lead decisions under delegated routine-policy authority (2026-10-12)
+
+- Add a new `cloudprovider/` package with a credential source abstraction that returns
+  opaque runtime credentials only to an injected transport. Credentials never appear
+  in serializable requests/results/errors/audit records and are never written to disk.
+- Define an explicit asynchronous job protocol: submit, bounded status poll, optional
+  cancellation, and verified result download. All network behavior is injected through
+  a deterministic test transport; no vendor endpoint, credential lookup, paid call,
+  cloud SDK, or background polling loop is added.
+- Reuse Provider capabilities/routing metadata and require explicit cost/latency
+  declarations. Routing/admission remains external; a cloud adapter never converts
+  estimates into spending authority. Rate limits/retries are bounded caller-driven
+  policy, respecting Retry-After but never retrying invalid/auth/permanent responses.
+- Download writes only to caller-provided controlled staging through an injected sink,
+  verifies declared SHA-256 and size, then returns safe logical result metadata. It
+  performs no cache publish/render/validation; existing Phase 09/10 boundaries own it.
+- No automatic polling goroutines, persistent secrets, provider-specific model names,
+  installation, paid generation, or external networking. Reviews: luna then luna6.
+
 Potential providers:
 
 ```text
@@ -2399,29 +2418,29 @@ future providers
 
 ## TODO
 
-- [ ] credential abstraction
-- [ ] configuration
-- [ ] request serialization
-- [ ] async jobs
-- [ ] polling
-- [ ] cancellation where supported
-- [ ] retry
-- [ ] rate limits
-- [ ] cost metadata
-- [ ] latency metadata
-- [ ] provider status
-- [ ] result download
-- [ ] checksum
-- [ ] validation
-- [ ] secret-safe logging
-- [ ] tests
-- [ ] Agent review #1
-- [ ] Fix
-- [ ] Agent review #2
-- [ ] Fix
-- [ ] Evidence
-- [ ] Docs
-- [ ] Commit
+- [x] credential abstraction (opaque injected source)
+- [x] configuration
+- [x] request serialization
+- [x] async jobs
+- [x] polling (caller-driven bounded)
+- [x] cancellation where supported
+- [x] retry
+- [x] rate limits
+- [x] cost metadata
+- [x] latency metadata
+- [x] provider status
+- [x] result download
+- [x] checksum
+- [x] validation
+- [x] secret-safe logging
+- [x] tests
+- [x] Agent review #1 (luna approved)
+- [x] Fix (no findings)
+- [x] Agent review #2 (terra approved; distinct model replacement for unavailable distinct Luna6)
+- [x] Fix (no findings)
+- [x] Evidence
+- [x] Docs
+- [x] Commit (`phase(15): add cloud provider contracts`)
 
 ---
 
@@ -3237,7 +3256,7 @@ The main session must maintain this section as the authoritative high-level prog
 [x] PHASE 12 — TUI Control Plane / Visual Review
 [x] PHASE 13 — Director Chat / ChangeSets / Visual Editing
 [x] PHASE 14 — Local AI Providers
-[ ] PHASE 15 — Cloud Providers
+[x] PHASE 15 — Cloud Providers
 [ ] PHASE 16 — End-to-End Autonomous Pipeline
 [ ] PHASE 17 — Performance / Reliability / Packaging
 [ ] PHASE 18 — Public Repository / Release Readiness

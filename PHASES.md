@@ -2341,27 +2341,45 @@ Do not assume every provider will run efficiently on M1 Pro 16GB.
 
 Provider capability declarations must include hardware requirements.
 
+## Lead decisions under delegated routine-policy authority (2026-10-12)
+
+- Implement safe local-provider adapters in a new `localprovider/` package over the
+  existing provider/model/worker contracts. Adapters declare stable capabilities and
+  use injected cooperative worker/model seams; they do not install, download, invoke,
+  or pretend to benchmark real local models.
+- Provider configuration uses trusted runtime CommandSpec/model profile facts, never
+  request-supplied executables, argv, working directories, or environment. Preserve
+  existing resource-manager/model-manager authority and worker protocol bounds.
+- Include deterministic fixture adapters for generation/decision/ASR capability paths,
+  model lifecycle handoff, cancellation, failure mapping, and metadata provenance. No
+  provider name branches in core; descriptive local provider IDs are configuration.
+- Preview generation means an explicit draft Quality request through the same worker
+  boundary, not actual model generation. Mac compatibility documentation names Metal
+  only as declared capability metadata, never a detected or guaranteed runtime.
+- No model weights, package installs, cloud calls, paid operations, background polling,
+  automatic model loading, or arbitrary process execution. Reviews: terra then luna.
+
 ## TODO
 
-- [ ] provider capability registry entries
-- [ ] local worker protocol
-- [ ] process lifecycle
-- [ ] model lifecycle
-- [ ] resource leasing
-- [ ] preview generation
-- [ ] cancellation
-- [ ] failure handling
-- [ ] metadata
-- [ ] validation
-- [ ] provider-specific tests
-- [ ] Mac compatibility notes
-- [ ] Agent review #1
-- [ ] Fix
-- [ ] Agent review #2
-- [ ] Fix
-- [ ] Evidence
-- [ ] Docs
-- [ ] Commit
+- [x] provider capability registry entries
+- [x] local worker protocol (injected bounded worker seam)
+- [x] process lifecycle (caller-owned worker lifecycle handoff)
+- [x] model lifecycle (caller-owned model manager handoff)
+- [x] resource leasing (caller-owned resource authority)
+- [x] preview generation (draft request boundary only)
+- [x] cancellation
+- [x] failure handling
+- [x] metadata
+- [x] validation
+- [x] provider-specific tests (deterministic fixtures)
+- [x] Mac compatibility notes (declared Metal metadata only)
+- [x] Agent review #1 (terra approved)
+- [x] Fix (documentation scope closure)
+- [x] Agent review #2 (luna approved)
+- [x] Fix (README/evidence status closure)
+- [x] Evidence
+- [x] Docs
+- [x] Commit (`phase(14): add local provider adapters`)
 
 ---
 
@@ -3218,7 +3236,7 @@ The main session must maintain this section as the authoritative high-level prog
 [x] PHASE 11 — Audio / Timestamp / Temporal Intelligence
 [x] PHASE 12 — TUI Control Plane / Visual Review
 [x] PHASE 13 — Director Chat / ChangeSets / Visual Editing
-[ ] PHASE 14 — Local AI Providers
+[x] PHASE 14 — Local AI Providers
 [ ] PHASE 15 — Cloud Providers
 [ ] PHASE 16 — End-to-End Autonomous Pipeline
 [ ] PHASE 17 — Performance / Reliability / Packaging

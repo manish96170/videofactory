@@ -2094,39 +2094,58 @@ Create the OpenCode-like terminal control room.
 
 The TUI must not contain business logic that belongs in core.
 
+## Lead decisions under delegated routine-policy authority (2026-10-12)
+
+- Build a dependency-free terminal control-plane model in a new `tui/` package first:
+  explicit state, tabs, commands, event projection, keyboard navigation, errors, and
+  cancellation. The package is a testable client over injected core interfaces, not a
+  renderer/provider/project mutation implementation.
+- Reuse Phase 10 preview read model and Phase 01 stable identities. Preview selection
+  is a timestamp/element read state only; review feedback is persisted through the
+  existing `review.Store`. No player process, web server, or duplicate mutation path.
+- Keep Director/ChangeSet application, review-before-submit behavior, and natural
+  language editing out of this phase (Phase 13). The Phase 12 Send-to-AI action is an
+  injected request callback only; it never applies a ChangeSet.
+- Use context-aware injected interfaces and bounded copied state/event payloads. The
+  event bus is best-effort observation, never UI state authority; no uncontrolled
+  goroutines, provider execution, resource leasing, or rendering are added.
+- Deliver in bounded slices: core state/navigation; event/task/control adapters;
+  preview/review-feedback integration; then a minimal stdlib terminal presentation.
+  Reviews: astra then terra, distinct from implementation.
+
 ## TODO
 
-- [ ] TUI application shell
-- [ ] tabs
-- [ ] project view
-- [ ] plan view
-- [ ] shots view
-- [ ] timeline view
-- [ ] assets view
-- [ ] models view
-- [ ] logs view
-- [ ] preview view
-- [ ] current preview timestamp
-- [ ] selected visual element
-- [ ] review feedback capture
-- [ ] Send to AI action
-- [ ] ChangeSet review/apply/cancel
-- [ ] resource status
-- [ ] event subscription
-- [ ] task progress
-- [ ] cancellation
-- [ ] responsive behavior
-- [ ] keyboard navigation
-- [ ] errors
-- [ ] agent status
-- [ ] tests where practical
-- [ ] Agent review #1
-- [ ] Fix
-- [ ] Agent review #2
-- [ ] Fix
-- [ ] Evidence
-- [ ] Docs
-- [ ] Commit
+- [x] TUI application shell
+- [x] tabs
+- [x] project view
+- [x] plan view
+- [x] shots view
+- [x] timeline view
+- [x] assets view
+- [x] models view
+- [x] logs view
+- [x] preview view
+- [x] current preview timestamp
+- [x] selected visual element
+- [x] review feedback capture
+- [x] Send to AI action (proposal-only)
+- [!] ChangeSet review/apply/cancel (Phase 13 boundary)
+- [x] resource status
+- [x] event subscription
+- [x] task progress
+- [x] cancellation
+- [x] responsive behavior
+- [x] keyboard navigation
+- [x] errors
+- [x] agent status
+- [x] tests where practical
+- [x] Agent review #1 (astra approved after fixes)
+- [x] Fix
+- [x] Agent review #2 (terra approved)
+- [x] Fix
+- [x] Evidence
+- [x] Docs
+- [x] Commit (`phase(12): implement TUI control plane`)
 
 ## Important
 
@@ -3177,7 +3196,7 @@ The main session must maintain this section as the authoritative high-level prog
 [x] PHASE 09 — Validation / Shot Intelligence
 [x] PHASE 10 — Preview / Checkpoint / Cache / Visual Review
 [x] PHASE 11 — Audio / Timestamp / Temporal Intelligence
-[ ] PHASE 12 — TUI Control Plane / Visual Review
+[x] PHASE 12 — TUI Control Plane / Visual Review
 [ ] PHASE 13 — Director Chat / ChangeSets / Visual Editing
 [ ] PHASE 14 — Local AI Providers
 [ ] PHASE 15 — Cloud Providers

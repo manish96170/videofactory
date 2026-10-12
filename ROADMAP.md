@@ -17,8 +17,8 @@ the authoritative source; this file mirrors them and must stay in sync.
 | 08    | Model Manager / Resource Planner             | DONE        |
 | 09    | Validation / Shot Intelligence               | DONE        |
 | 10    | Preview / Checkpoint / Cache / Visual Review | DONE        |
-| 11    | Audio / Timestamp / Temporal Intelligence    | NOT STARTED |
-| 12    | TUI Control Plane / Visual Review            | NOT STARTED |
+| 11    | Audio / Timestamp / Temporal Intelligence    | DONE        |
+| 12    | TUI Control Plane / Visual Review            | DONE        |
 | 13    | Director Chat / ChangeSets / Visual Editing  | NOT STARTED |
 | 14    | Local AI Providers                           | NOT STARTED |
 | 15    | Cloud Providers                              | NOT STARTED |

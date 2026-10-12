@@ -13,7 +13,7 @@ Prompt → Director → VideoPlan → Shot Planner → Shot Intelligence
 
 ## Status
 
-Completed through Phase 10 (Preview / Checkpoint / Cache / Visual Review). Phase 10
+Completed through Phase 12 (TUI Control Plane / Visual Review). Phase 10
 adds verified artifact caching, resumable checkpoints, review-feedback persistence,
 and a programmatic preview read model; it does not yet provide the Phase 12 player or
 TUI. The project is not release-ready and no phase has been pushed.

@@ -46,6 +46,7 @@ type View struct {
 	manifest     domain.RenderManifest
 	placement    domain.TimelineEntry
 	revision     string
+	mediaDigest  artifact.Digest
 }
 
 // Resolve looks up an exact project/shot/key/quality identity. Missing or corrupt
@@ -116,7 +117,7 @@ func (r *Reader) Resolve(ctx context.Context, p domain.Project, id artifact.Iden
 		return View{}, false, ErrInvalid
 	}
 	sum := sha256.Sum256(revisionData)
-	v := View{identity: id, mediaName: entry.Media.Name, manifestName: manifestFile.Name, manifest: manifest, placement: placement, revision: hex.EncodeToString(sum[:])}
+	v := View{identity: id, mediaName: entry.Media.Name, manifestName: manifestFile.Name, manifest: manifest, placement: placement, revision: hex.EncodeToString(sum[:]), mediaDigest: entry.Media.Digest}
 	if err := ctx.Err(); err != nil {
 		return View{}, false, err
 	}
@@ -129,9 +130,10 @@ func acceptedValidation(id artifact.Identity, result *domain.ValidationResult) b
 		result.FailureClass == "" && !result.RetryRecommended
 }
 
-func (v View) Identity() artifact.Identity { return v.identity }
-func (v View) MediaName() string           { return v.mediaName }
-func (v View) ManifestName() string        { return v.manifestName }
+func (v View) Identity() artifact.Identity  { return v.identity }
+func (v View) MediaName() string            { return v.mediaName }
+func (v View) ManifestName() string         { return v.manifestName }
+func (v View) MediaDigest() artifact.Digest { return v.mediaDigest }
 
 // Revision is an opaque deterministic rebuild/reload token. It changes when the
 // verified artifact, authoritative metadata binding or timeline placement changes.

@@ -2450,6 +2450,28 @@ future providers
 
 Connect everything.
 
+## Lead decisions under delegated routine-policy authority (2026-10-12)
+
+- Add a new `pipeline/` package with one synchronous context-aware orchestrator. It
+  consumes injected Director, Shot Intelligence, preview Coordinator, checkpoint, and
+  optional approved executor seams; it never chooses/adopts a provider or spends money.
+- Deterministic-only is the required executable path: prompt → plan → sequential shot
+  analysis → cached preview rendering/validation → timeline composition → verified MP4.
+  Any non-deterministic/local/cloud/mixed strategy is returned as a typed pending or
+  externally-approved execution requirement, not silently generated.
+- Resume reads Phase 10 checkpoint/artifact evidence and rebuilds only pending or
+  invalidated shots. Partial failure retains completed artifact/checkpoint evidence;
+  cancellation returns no fabricated final result. Retry is delegated only through an
+  injected bounded policy/seam and never retries permanent/cancelled work.
+- Approval gates are explicit: caller must enable approved execution and provide a
+  pre-admitted executor for local/cloud strategies. No automatic paid/cloud action,
+  model load, provider route mutation, or scheduler/goroutine is added.
+- Preserve Phase 10 cache keys and artifact integrity; compose only verified returned
+  shot media. Emit optional existing events as best-effort immutable observations.
+  Tests use deterministic render fixtures and never require a cloud/local model.
+- Reviews: terra then luna. Performance baseline is measured deterministic fixture
+  timing only, not a hardware/model benchmark.
+
 Target:
 
 ```text
@@ -2469,28 +2491,28 @@ Prompt
 
 ## TODO
 
-- [ ] end-to-end orchestration
-- [ ] deterministic-only path
-- [ ] local-AI path
-- [ ] cloud path
-- [ ] mixed-provider path
-- [ ] preview path
-- [ ] approval path
-- [ ] cancellation
-- [ ] resume
-- [ ] retry
-- [ ] partial failure recovery
-- [ ] incremental rebuild
-- [ ] full project integration test
-- [ ] sample project
-- [ ] performance baseline
-- [ ] Agent review #1
-- [ ] Fix
-- [ ] Agent review #2
-- [ ] Fix
-- [ ] Evidence
-- [ ] Docs
-- [ ] Commit
+- [x] end-to-end orchestration
+- [x] deterministic-only path
+- [x] local-AI path (typed pending approval, no execution)
+- [x] cloud path (typed pending approval, no execution)
+- [x] mixed-provider path (typed pending approval, no execution)
+- [x] preview path
+- [x] approval path (explicit pending gate)
+- [x] cancellation
+- [x] resume
+- [x] retry (bounded explicit retryable seam)
+- [x] partial failure recovery
+- [x] incremental rebuild
+- [x] full project integration test (guarded real FFmpeg MP4 composition)
+- [x] sample project (deterministic fixture)
+- [x] performance baseline (deterministic fixture timing)
+- [x] Agent review #1 (terra approved after fixes)
+- [x] Fix (composition/output/retry/invalidation corrections)
+- [x] Agent review #2 (luna approved)
+- [x] Fix (no findings)
+- [x] Evidence
+- [x] Docs
+- [x] Commit (`phase(16): implement end-to-end autonomous pipeline`)
 
 ## Required milestone
 
@@ -3257,7 +3279,7 @@ The main session must maintain this section as the authoritative high-level prog
 [x] PHASE 13 — Director Chat / ChangeSets / Visual Editing
 [x] PHASE 14 — Local AI Providers
 [x] PHASE 15 — Cloud Providers
-[ ] PHASE 16 — End-to-End Autonomous Pipeline
+[x] PHASE 16 — End-to-End Autonomous Pipeline
 [ ] PHASE 17 — Performance / Reliability / Packaging
 [ ] PHASE 18 — Public Repository / Release Readiness
 ```

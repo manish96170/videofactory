@@ -74,7 +74,7 @@ func TestResolveVerifiedArtifactAndManifest(t *testing.T) {
 	}
 	e := publish(t, r, req)
 	v = resolve(t, r, p, req.Identity)
-	if v.Identity() != req.Identity || v.MediaName() != e.Media.Name || v.ManifestName() != e.ManifestFile.Name || v.Placement() != p.Timeline.Entries[0] || !reflect.DeepEqual(v.Manifest(), e.Manifest) {
+	if v.Identity() != req.Identity || v.MediaName() != e.Media.Name || v.ManifestName() != e.ManifestFile.Name || v.MediaDigest() != e.Media.Digest || v.Placement() != p.Timeline.Entries[0] || !reflect.DeepEqual(v.Manifest(), e.Manifest) {
 		t.Fatal("verified entry not preserved")
 	}
 	if filepath.IsAbs(v.MediaName()) || strings.Contains(v.MediaName(), root) {

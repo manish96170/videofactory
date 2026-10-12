@@ -179,6 +179,29 @@ func (s *Store) Lookup(ctx context.Context, id Identity) (Entry, bool, error) {
 	return e, true, nil
 }
 
+// ResolveMedia returns the controlled-root path for an exact, fully verified
+// artifact. The returned path is root-relative evidence resolved to an absolute
+// local path only after Lookup has verified the entry bytes and metadata. The
+// caller must use it only while the Store's exclusive-root contract holds.
+func (s *Store) ResolveMedia(ctx context.Context, id Identity) (string, Entry, bool, error) {
+	entry, found, err := s.Lookup(ctx, id)
+	if err != nil || !found {
+		return "", Entry{}, found, err
+	}
+	if err := ctx.Err(); err != nil {
+		return "", Entry{}, false, err
+	}
+	mediaPath, err := s.checkedPath(entry.Media.Name, false)
+	if err != nil {
+		return "", Entry{}, false, safeStoreError(err)
+	}
+	info, err := os.Lstat(mediaPath)
+	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+		return "", Entry{}, false, ErrUnsafePath
+	}
+	return mediaPath, entry, true, nil
+}
+
 func (s *Store) lookup(ctx context.Context, id Identity) (Entry, error) {
 	base := entryName(id)
 	data, err := s.read(ctx, base+"/entry.json", s.metadataLimit)
